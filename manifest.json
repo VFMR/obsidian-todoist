@@ -1,0 +1,11 @@
+{
+	"id": "obsidian-todoist",
+	"name": "Obsidian to Todoist",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Send tasks from Obsidian to Todoist",
+	"author": "VFMR",
+	"authorUrl": "",
+	"fundingUrl": "",
+	"isDesktopOnly": false
+}
