@@ -2,29 +2,38 @@ import { TodoistApi } from "@doist/todoist-api-typescript"
 
 import {MySettingTab} from './settings'
 
-const api = new TodoistApi("0123456789abcdef0123456789")
+
+async function getProjects(token) {
+    const api = TodoistApi(token);
+    const projects = await api.getProjects();
+    return projects;
+}
 
 
-export async function getProjects(token) {
-    const api = TodoistApi(token)
-    const projects = await api.getProjects()
-    return projects
+async function getProjectList(token) {
+    const api = TodoistApi(token);
+    const projects = await api.getProjects();
+    var project_list = [];
+    for (var i = 0; i < projects.length; i++) {
+        project_list.push(projects[i].name);
+    }
+    return project_list;
 }
 
 
 // function to get project id from project name
-export async function getProjectId(token, project_name) {
-    const api = TodoistApi(token)
-    const projects = await api.getProjects()
-    var project_id = 0
+async function getProjectId(token, project_name) {
+    const api = TodoistApi(token);
+    const projects = await api.getProjects();
+    var project_id = 0;
 
     // find the name most similar to the project_name
     for (var i = 0; i < projects.length; i++) {
-      var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()
-      var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()
+      var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+      var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
       if (project_name_clean2.includes(project_name_clean)) {
-        project_id = projects[i].id
-        break
+        project_id = projects[i].id;
+        break;
       }
 
     return project_id
@@ -32,21 +41,32 @@ export async function getProjectId(token, project_name) {
 
 
 // function to create a task. return whether it was successful or not
-export async function createTaskWithProjectID(token, content, project_id) {
+async function createTaskWithProjectID(token, 
+                                              content,
+                                              project_id,
+                                              priority,
+                                              due) {
     const api = TodoistApi(token)
     // create task add project id only if it is not 0
     // if project id is 0, it will be added to inbox
     if (project_id != 0) {
-        await api.addTask({content, project_id})
+        await api.addTask({content, project_id, priority, due});
     } else {
-        await api.addTask({content})
+        await api.addTask({content, priority, due});
     }
 }
 
-
-export async function createTask(token, content, project_name) {
-    const project_id = await getProjectId(token, project_name)
-    return createTaskWithProjectID(token, content, project_id)
+export function createTask(token, 
+                          content,
+                          project_name,
+                          priority,
+                          due) {
+    const project_id = await getProjectId(token, project_name);
+    return createTaskWithProjectID(token, 
+                                   content,
+                                   project_id,
+                                   priority,
+                                   due)
 }
 
 
