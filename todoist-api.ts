@@ -1,17 +1,15 @@
-import { TodoistApi } from "@doist/todoist-api-typescript"
-
-import {MySettingTab} from './settings'
+import { TodoistApi } from "@doist/todoist-api-typescript";
 
 
 async function getProjects(token) {
-    const api = TodoistApi(token);
+    const api = new TodoistApi(token);
     const projects = await api.getProjects();
     return projects;
 }
 
 
-async function getProjectList(token) {
-    const api = TodoistApi(token);
+async function getProjectList(token): string[] {
+    const api = new TodoistApi(token);
     const projects = await api.getProjects();
     var project_list = [];
     for (var i = 0; i < projects.length; i++) {
@@ -22,8 +20,8 @@ async function getProjectList(token) {
 
 
 // function to get project id from project name
-async function getProjectId(token, project_name) {
-    const api = TodoistApi(token);
+async function getProjectId(token, project_name): number {
+    const api = new TodoistApi(token);
     const projects = await api.getProjects();
     var project_id = 0;
 
@@ -36,7 +34,8 @@ async function getProjectId(token, project_name) {
         break;
       }
 
-    return project_id
+    return project_id;
+  }
 }
 
 
@@ -46,17 +45,29 @@ async function createTaskWithProjectID(token,
                                               project_id,
                                               priority,
                                               due) {
-    const api = TodoistApi(token)
+    const api = new TodoistApi(token);
     // create task add project id only if it is not 0
     // if project id is 0, it will be added to inbox
     if (project_id != 0) {
-        await api.addTask({content, project_id, priority, due});
+        response = await api.addTask({
+          "content": content, 
+          "project_id": project_id,
+          "priority": priority,
+          "dueString": due,
+          "dueLang": "de",
+        });
     } else {
-        await api.addTask({content, priority, due});
+        respone = await api.addTask({
+          "content": content, 
+          "priority": priority,
+          "dueString": due,
+          "dueLang": "de",
+        });
     }
+    return response;
 }
 
-export function createTask(token, 
+export async function createTask(token, 
                           content,
                           project_name,
                           priority,
@@ -66,7 +77,7 @@ export function createTask(token,
                                    content,
                                    project_id,
                                    priority,
-                                   due)
+                                   due);
 }
 
 

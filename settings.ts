@@ -1,7 +1,7 @@
 import {App, Plugin, PluginSettingTab, Setting} from 'obsidian';
 import ObsidianTodoist from './main';
 
-class MySettingTab extends PluginSettingTab {
+export class MySettingTab extends PluginSettingTab {
 	plugin: MyPlugin;
 
 	constructor(app: App, plugin: MyPlugin) {
@@ -23,7 +23,7 @@ class MySettingTab extends PluginSettingTab {
 				.setPlaceholder('Enter your secret')
 				.setValue(this.plugin.settings.mySetting)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.apiToken = value;
 					await this.plugin.saveSettings();
 				}));
 	}

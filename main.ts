@@ -4,18 +4,25 @@ import {MySettingTab} from './settings'
 import {createTask} from './todoist-api'
 
 // function to find all the tasks in the current file
-function findTasks(editor: Editor) {
-  const tasks = editor.getValue().match(/^- \[ \].*/g);
-  return tasks;
+// returns an array of strings
+function findTasks() {
+  const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
+  const tasks = editor.getValue().match(/- \[.\] .*(\n|$)/g);
+  if (tasks) {
+    return tasks;
+  } else {
+    return [];
+  }
 }
 
 
 function findPriority(task: string) {
   const priority = task.match(/p\d/);
+  // return integer
   if (priority) {
-    return priority[0].slice(1);
+    return parseInt(priority[0].slice(1));
   } else {
-    return '4';
+    return 4;
   }
 }
 
@@ -32,7 +39,7 @@ function findDueDate(task: string) {
 
 function makeTask(task_string: string) {
   return {
-      content: task_string.replace(/^- \[ \]/, ''),
+      content: task_string.replace(/^- \[ \]/, '').replace('\n', ''),
       priority: findPriority(task_string),
       due_string: findDueDate(task_string),
   };
@@ -84,6 +91,8 @@ export default class MyPlugin extends Plugin {
 			new Notice('Sending tasks');
       const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
       const tasks = findTasks(editor);
+      new Notice(this.settings.apiToken);
+
       if (tasks.length === 1) {
         sendTask(this.settings.apiToken, tasks[0]);
       }
@@ -114,7 +123,7 @@ export default class MyPlugin extends Plugin {
           sendTask(this.settings.apiToken, selection);
         }
         catch (e) {
-          throw new notice(e);
+          new Notice(e);
 			  }
       }
 		});
@@ -129,7 +138,7 @@ export default class MyPlugin extends Plugin {
           sendMultipleTasks(this.settings.apiToken, tasks);
         }
         catch (e) {
-          throw new notice(e);
+          new Notice(e);
 			  }
       }
 		});
@@ -145,7 +154,7 @@ export default class MyPlugin extends Plugin {
 
     //
 		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new MySettingTab(this.app, this));
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
