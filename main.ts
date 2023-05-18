@@ -1,8 +1,14 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { TodoistApi } from "@doist/todoist-api-typescript";
 
-import {MySettingTab} from './settings'
-import {createTask, TodoistProject} from './todoist-api'
+import {MySettingTab} from './settings';
+import {getProjects, createTask, TodoistProject} from './todoist-api';
 
+
+
+interface MyPluginSettings {
+	apiToken: string;
+}
 
 interface TodoistTask {
   content: string;
@@ -11,34 +17,41 @@ interface TodoistTask {
   priority: number;
   due_string: string;
   due_lang: string;
+};
+
+
+const DEFAULT_SETTINGS: MyPluginSettings = {
+  apiToken: '',
 }
 
 
 // function to find all the tasks in the current file
 // returns an array of strings
-function findTasks() {
-  const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
+function findTasks(editor: Editor): string[] {
   const tasks = editor.getValue().match(/- \[.\] .*(\n|$)/g);
   if (tasks) {
     return tasks;
   } else {
     return [];
   }
+  new Notice(tasks);
 }
 
 
 // function to get project id from project name
 async function getProjectId(projects: TodoistProject[], project_name: string): string {
-    var project_id = 0;
+    var project_id = "0";
 
     // find the name most similar to the project_name
     if (project_name != null) {
-      for (var i = 0; i < projects.length; i++) {
-        var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-        var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-        if (project_name_clean2.includes(project_name_clean)) {
-          project_id = projects[i].id;
-          break;
+      if (project_name != "") {
+        for (var i = 0; i < projects.length; i++) {
+          var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+          var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+          if (project_name_clean2.includes(project_name_clean)) {
+            project_id = projects[i].id;
+            break;
+          }
         }
       }
     }
@@ -46,7 +59,7 @@ async function getProjectId(projects: TodoistProject[], project_name: string): s
 }
 
 
-function findPriority(task: string) {
+function findPriority(task: string): number {
   const priority = task.match(/p\d/);
   // return integer
   if (priority) {
@@ -57,7 +70,7 @@ function findPriority(task: string) {
 }
 
 
-function findDueDate(task: string) {
+function findDueDate(task: string): string {
   const dueDate = task.match(/due: .*(,|$)/);
   if (dueDate) {
     return dueDate[0].slice(5, -1);
@@ -69,71 +82,80 @@ function findDueDate(task: string) {
 
 function makeTask(projects: TodoistProject[], 
                   task_string: string): TodoistTask {
-  return TodoistTask = {
-    content: task_string.replace(/^- \[ \]/, '').replace('\n', ''),
-    project_id: getProjectId(projects, task_string.match(/#.*(\s|$)/)),
-    project_name: task_string.match(/#.*(\s|$)/),
-    priority: findPriority(task_string),
-    due_string: findDueDate(task_string),
-    due_lang: "de",
-  };
+    const task: TodoistTask = {
+    "content": task_string.replace(/^- \[ \]/, '').replace('\n', ''),
+    "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
+    "project_name": task_string.match(/#.*(\s|$)/),
+    "priority": findPriority(task_string),
+    "due_string": findDueDate(task_string),
+    "due_lang": "de"
+    };
+  new Notice(task)
+  return task;
 }
 
 
-function makeMultipleTasks(tasks: string[]): TodoistTask[] {
-  const task_objects = [];
-  for (const task of tasks) {
-    task_objects.push(makeTask(task));
+// function makeMultipleTasks(projects: TodoistProject[], 
+//                            tasks: string[]): TodoistTask[] {
+//   const task_objects = TodoistTask[];
+//   for (const task of tasks) {
+//     task_objects.push(makeTask(task));
+//   }
+//   return task_objects;
+// }
+
+
+function sendTask(api: TodoistApi,
+                  projects: TodoistProject[], 
+                  task_string: string) {
+  const task = makeTask(projects, task_string);
+  createTask(api, task);
+}
+
+
+function sendMultipleTasks(api: TodoistApi,
+                           projects: TodoistProject[],
+                           task_strings: string[]) {
+  for (const task_string of task_strings) {
+    sendTask(api, projects, task_string)
   }
-  return task_objects;
-}
-
-function sendTask(token: string, task_string: string) {
-  const task = makeTask(editor);
-  createTask(token, task.content, task.priority, task.due_string);
 }
 
 
-function sendMultipleTasks(token: string, tasks: string[]) {
-  const task_objects = makeMultipleTasks(tasks);
-  for (const task of task_objects) {
-    createTask(token, task.content, task.priority, task.due_string);
+async function findAndSendTasks(api: TodistApi, editor: Editor) {
+  const tasks = findTasks(editor);
+  let projects: TodoistProject[];
+  
+  if (tasks.length === 0) {
+    new Notice('No tasks found');
+
+  } else if (tasks.length === 1) {
+    projects = await getProjects(api);
+    await sendTask(api, projects, tasks[0]);
+
+  } else {
+    projects = await getProjects(api);
+    new Notice(projects)
+    await sendMultipleTasks(api, projects, tasks);
   }
+
 }
 
-
-interface MyPluginSettings {
-	apiToken: string;
-}
-
-const DEFAULT_SETTINGS: MyPluginSettings = {
-  apiToken: '',
-}
 
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
-
-
-
 	async onload() {
 		await this.loadSettings();
+    
+    this.api = new TodoistApi(this.settings.apiToken);
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Send to Todoist', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
-			new Notice('Sending tasks');
       const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
-      const tasks = findTasks(editor);
-      new Notice(this.settings.apiToken);
-
-      if (tasks.length === 1) {
-        sendTask(this.settings.apiToken, tasks[0]);
-      }
-      else {
-        sendMultipleTasks(this.settings.apiToken, tasks);
-      }
+      findAndSendTasks(this.api, editor);
 		});
     
 		// Perform additional things with the ribbon
@@ -152,10 +174,10 @@ export default class MyPlugin extends Plugin {
 		this.addCommand({
 			id: 'todoist-send-selection',
 			name: 'Send selection to Todoist',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
         const selection = editor.getSelection();
         try {
-          sendTask(this.settings.apiToken, selection);
+          await sendTask(this.api, selection);
         }
         catch (e) {
           new Notice(e);
@@ -167,14 +189,13 @@ export default class MyPlugin extends Plugin {
 		this.addCommand({
 			id: 'todoist-send-file',
 			name: 'Send file to Todoist',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-        const tasks = findTasks(editor);
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
         try {
-          sendMultipleTasks(this.settings.apiToken, tasks);
+          await findAndSendTasks(this.api, editor);
         }
         catch (e) {
           new Notice(e);
-			  }
+        }
       }
 		});
 

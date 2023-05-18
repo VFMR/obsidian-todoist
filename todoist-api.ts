@@ -4,62 +4,45 @@ import { TodoistApi } from "@doist/todoist-api-typescript";
 export interface TodoistProject {
     id: string;
     name: string;
-}
+};
 
 
-async function getProjects(token: string): TodoistProjects[] {
-    const api = new TodoistApi(token);
+interface TodoistTask {
+  content: string;
+  project_id: string;
+  project_name: string;
+  priority: number;
+  due_string: string;
+  due_lang: string;
+};
+
+
+export async function getProjects(api: TodoistApi): TodoistProject[] {
     const projects = await api.getProjects();
+    new Notice(projects)
 
-    var project_list = [];
-    for (var i = 0; i < projects.length; i++) {
-        project_list.push(new TodoistProject(projects[i].id, projects[i].name));
+    const project_list: TodoistProject[] = [];
+    for (let i = 0; i < projects.length; i++) {
+      project_list.push({
+        id: projects[i].id,
+        name: projects[i].name
+      });
     }
     return project_list;
 }
 
 
-
 // function to create a task. return whether it was successful or not
-async function createTaskWithProjectID(token: string, 
-                                       content: string,
-                                       project_id: number,
-                                       priority: number,
-                                       due: string) {
-    const api = new TodoistApi(token);
-    // create task add project id only if it is not 0
-    // if project id is 0, it will be added to inbox
-    if (project_id != 0) {
-        response = await api.addTask({
-          "content": content, 
-          "project_id": project_id,
-          "priority": priority,
-          "dueString": due,
-          "dueLang": "de",
-        });
-    } else {
-        respone = await api.addTask({
-          "content": content, 
-          "priority": priority,
-          "dueString": due,
-          "dueLang": "de",
-        });
-    }
-    return response;
+export async function createTask(api: TodoistApi, task: TodoistTask) {
+  // BUG: project_id is not working - "{}" ist sent to the API
+  const response = await api.addTask({
+    content: task.content, 
+    priority: task.priority,
+    // project_id: task.project_id,
+    due_string: task.due_string,
+    due_lang: task.due_lang,
+  });
+  return response;
 }
-
-export async function createTask(token: string, 
-                                 content: string,
-                                 project_name: string,
-                                 priority: number,
-                                 due: string) {
-    const project_id = await getProjectId(token, project_name);
-    return createTaskWithProjectID(token, 
-                                   content,
-                                   project_id,
-                                   priority,
-                                   due);
-}
-
 
 
