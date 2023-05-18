@@ -177,15 +177,6 @@ async function getProjectId(projects: TodoistProject[], project_name: string): s
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
-  testMethod() {
-    console.log(this.settings.dueLanguage)
-    console.log(this.settings.taskPattern)
-  }
-
-  testMethod2() {
-    this.testMethod()
-  }
-
 
 	async onload() {
 		await this.loadSettings();
@@ -205,15 +196,6 @@ export default class MyPlugin extends Plugin {
                        this.settings.dueLanguage);
 		});
     
-		// Perform additional things with the ribbon
-    this.addCommand({
-      id: 'todoist-test',
-      name: 'Test',
-      Callback: () => {
-        this.testMethod2();
-      }
-    });
-		
    
 		this.addCommand({
 			id: 'todoist-sync',

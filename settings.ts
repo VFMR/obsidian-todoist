@@ -33,29 +33,29 @@ export class MySettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h3', {text: 'Task settings'});
 
-    // Setting for pattern to detect tasks
-    new Setting(containerEl)
-      .setName('Pattern for tasks')
-      .setDesc('Specify a regex pattern to detect tasks that shall be sent to todoist. Default is "/- \[ \] .*/g" to send all markdown tasks.')
-      .addText(text => text
-        .setPlaceholder('/- \[ \] .*/g')
-        .setValue(this.plugin.settings.taskPattern)
-        .onChange(async (value) => {
-          this.plugin.settings.taskPattern = value;
-          await this.plugin.saveSettings();
-        }));
-
-
-    new Setting(containerEl)
-      .setName('Pattern for due dates')
-      .setDesc('Specify a regex pattern to detect due dates. Default is /due: [a-zA-Z0-9\-\.]+/g')
-      .addText(text => text
-        .setPlaceholder('/due: [a-zA-Z0-9\-\.]+/g')
-        .setValue(this.plugin.settings.duePattern)
-        .onChange(async (value) => {
-          this.plugin.settings.duePattern = value;
-          await this.plugin.saveSettings();
-        }));
+    // // Setting for pattern to detect tasks
+    // new Setting(containerEl)
+    //   .setName('Pattern for tasks')
+    //   .setDesc('Specify a regex pattern to detect tasks that shall be sent to todoist. Default is "/- \[ \] .*/g" to send all markdown tasks.')
+    //   .addText(text => text
+    //     .setPlaceholder('/- \[ \] .*/g')
+    //     .setValue(this.plugin.settings.taskPattern)
+    //     .onChange(async (value) => {
+    //       this.plugin.settings.taskPattern = value;
+    //       await this.plugin.saveSettings();
+    //     }));
+    //
+    //
+    // new Setting(containerEl)
+    //   .setName('Pattern for due dates')
+    //   .setDesc('Specify a regex pattern to detect due dates. Default is /due: [a-zA-Z0-9\-\.]+/g')
+    //   .addText(text => text
+    //     .setPlaceholder('/due: [a-zA-Z0-9\-\.]+/g')
+    //     .setValue(this.plugin.settings.duePattern)
+    //     .onChange(async (value) => {
+    //       this.plugin.settings.duePattern = value;
+    //       await this.plugin.saveSettings();
+    //     }));
 
     new Setting(containerEl)
       .setName('Language for due dates')
@@ -73,17 +73,17 @@ export class MySettingTab extends PluginSettingTab {
 		containerEl.createEl('h3', {text: 'Auto sync settings'});
 
 
-    // Setting for pattern to detect files for sync
-    new Setting(containerEl)
-      .setName('Pattern for files to sync')
-      .setDesc('Specify a pattern to detect files for sync')
-      .addText(text => text
-        .setPlaceholder('/{{todoist}}/g')
-        .setValue(this.plugin.settings.syncPattern)
-        .onChange(async (value) => {
-          this.plugin.settings.syncPattern = value;
-          await this.plugin.saveSettings();
-        }));
+    // // Setting for pattern to detect files for sync
+    // new Setting(containerEl)
+    //   .setName('Pattern for files to sync')
+    //   .setDesc('Specify a pattern to detect files for sync')
+    //   .addText(text => text
+    //     .setPlaceholder('/{{todoist}}/g')
+    //     .setValue(this.plugin.settings.syncPattern)
+    //     .onChange(async (value) => {
+    //       this.plugin.settings.syncPattern = value;
+    //       await this.plugin.saveSettings();
+    //     }));
 
     // setting for sync on plugin load
     new Setting(containerEl)
