@@ -24,16 +24,17 @@ async function getProjectId(token, project_name): number {
     const api = new TodoistApi(token);
     const projects = await api.getProjects();
     var project_id = 0;
-
     // find the name most similar to the project_name
-    for (var i = 0; i < projects.length; i++) {
-      var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-      var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-      if (project_name_clean2.includes(project_name_clean)) {
-        project_id = projects[i].id;
-        break;
+    if (project_name) {
+      for (var i = 0; i < projects.length; i++) {
+        var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        if (project_name_clean2.includes(project_name_clean)) {
+          project_id = projects[i].id;
+          break;
+        }
       }
-
+    }
     return project_id;
   }
 }

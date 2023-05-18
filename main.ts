@@ -40,6 +40,7 @@ function findDueDate(task: string) {
 function makeTask(task_string: string) {
   return {
       content: task_string.replace(/^- \[ \]/, '').replace('\n', ''),
+      project_name: task_string.match(/#.*(\s|$)/),
       priority: findPriority(task_string),
       due_string: findDueDate(task_string),
   };
