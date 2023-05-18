@@ -63,10 +63,12 @@ function findPriority(task: string): number {
   const priority = task.match(/p\d/);
   // return integer
   if (priority) {
-    return parseInt(priority[0].slice(1));
+    const prio_num = parseInt(priority[0].slice(1));
   } else {
-    return 4;
+    prio_num =  4;
   }
+  // reverse numbers to be consistent with app, where 1 is highest priority:
+  return 5 - prio_num;
 }
 
 
