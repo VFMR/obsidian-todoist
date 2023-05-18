@@ -8,7 +8,15 @@ import {getProjects, createTask, TodoistProject} from './todoist-api';
 
 interface MyPluginSettings {
 	apiToken: string;
+  taskPattern: string;
+  taskRemovePattern: string;
+  duePattern: string;
+  dueRemovePattern: string;
+  syncPattern: string;
+  syncOnLoad: boolean;
+  dueLanguage: string;
 }
+
 
 interface TodoistTask {
   content: string;
@@ -20,8 +28,22 @@ interface TodoistTask {
 };
 
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
+// TODO: add as parameters to the plugin settings instead of hardcoding
+const DEFAULT_PATTERNS = {
+  taskPattern: '/- \[ \] .*(\n|$)/g',
+  taskRemovePattern: /- \[ \] /g,
+  duePattern: /due: .*(\n|$)/g,
+  dueRemovePattern: /due: /g,
+  syncPattern: /{{todoist}}/g,
+}
+
+
+const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
   apiToken: '',
+  syncOnLoad: true,
+  syncPattern: '/{{todoist}}/g',
+  taskPattern: '/- \[ \] .*(\n|$)/g', 
+  dueLanguage: 'en'
 }
 
 
@@ -36,9 +58,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 //   new Notice(tasks);
 // }
 
-
 function findTasks(text: string): string[] {
-  const tasks = text.match(/- \[.\] .*(\n|$)/g);
+  const tasks = text.match(DEFAULT_PATTERNS.taskPattern);
   if (tasks) {
     return tasks;
   } else {
@@ -46,6 +67,91 @@ function findTasks(text: string): string[] {
   }
 }
 
+
+function findPriority(task: string): number {
+  const priority = task.match(/p\d/);
+  var prio_num = 4;
+  // return integer
+  if (priority) {
+    prio_num = parseInt(priority[0].slice(1));
+  } 
+  // reverse numbers to be consistent with app, where 1 is highest priority:
+  return parseInt(5 - prio_num);
+}
+
+
+function findDueDate(task: string): string {
+  // FIXME - this only allows for due dates without spaces
+  const dueDate = task.match(DEFAULT_PATTERNS.duePattern);
+  if (dueDate) {
+    return dueDate[0].replace(DEFAULT_PATTERNS.dueRemovePattern, '')
+  } else {
+    return null;
+  }
+}
+
+
+function makeTask(projects: TodoistProject[], 
+                  task_string: string,
+                  dueLanguage): TodoistTask {
+    // TODO: add support for labels
+    // TODO: add support for description
+    // TODO: add support for assignee
+    // TODO: add support for due dates with spaces
+    // TODO: fix project_id recognition 
+    const task: TodoistTask = {
+    "content": task_string.replace(DEFAULT_PATTERNS.taskRemovePattern, '').replace('\n', ''),
+    "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
+    "project_name": task_string.match(/#.*(\s|$)/),
+    "priority": findPriority(task_string),
+    "due_string": findDueDate(task_string),
+    "due_lang": dueLanguage,
+    };
+  new Notice(task)
+  return task;
+}
+
+
+
+function sendTask(api: TodoistApi,
+                  projects: TodoistProject[], 
+                  task_string: string,
+                  dueLanguage: string) {
+  const task = makeTask(projects, task_string, dueLanguage);
+  createTask(api, task);
+}
+
+
+function sendMultipleTasks(api: TodoistApi,
+                           projects: TodoistProject[],
+                           task_strings: string[],
+                           dueLanguage: string) {
+  for (const task_string of task_strings) {
+    sendTask(api, projects, task_string, dueLanguage)
+  }
+}
+
+
+async function findAndSendTasks(api: TodistApi,
+                                text: string,
+                                dueLanguage: string) {
+  const tasks = findTasks(text);
+  let projects: TodoistProject[];
+  
+  if (tasks.length === 0) {
+    new Notice('No tasks found');
+
+  } else if (tasks.length === 1) {
+    projects = await getProjects(api);
+    await sendTask(api, projects, tasks[0], dueLanguage);
+
+  } else {
+    projects = await getProjects(api);
+    new Notice(projects)
+    await sendMultipleTasks(api, projects, tasks, dueLanguage);
+  }
+
+}
 
 // function to get project id from project name
 async function getProjectId(projects: TodoistProject[], project_name: string): string {
@@ -68,111 +174,51 @@ async function getProjectId(projects: TodoistProject[], project_name: string): s
 }
 
 
-function findPriority(task: string): number {
-  const priority = task.match(/p\d/);
-  var prio_num = 4;
-  // return integer
-  if (priority) {
-    prio_num = parseInt(priority[0].slice(1));
-  } 
-  // reverse numbers to be consistent with app, where 1 is highest priority:
-  return parseInt(5 - prio_num);
-}
-
-
-function findDueDate(task: string): string {
-  // FIXME - this only allows for due dates without spaces
-  const dueDate = task.match(/due: .*/);
-  if (dueDate) {
-    return dueDate[0].slice(5);
-  } else {
-    return null;
-  }
-}
-
-
-function makeTask(projects: TodoistProject[], 
-                  task_string: string): TodoistTask {
-    // TODO: add support for labels
-    // TODO: add support for description
-    // TODO: add support for assignee
-    // TODO: add support for due dates with spaces
-    // TODO: fix project_id recognition 
-    const task: TodoistTask = {
-    "content": task_string.replace(/^- \[ \]/, '').replace('\n', ''),
-    "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
-    "project_name": task_string.match(/#.*(\s|$)/),
-    "priority": findPriority(task_string),
-    "due_string": findDueDate(task_string),
-    "due_lang": "de"
-    };
-  new Notice(task)
-  return task;
-}
-
-
-
-function sendTask(api: TodoistApi,
-                  projects: TodoistProject[], 
-                  task_string: string) {
-  const task = makeTask(projects, task_string);
-  createTask(api, task);
-}
-
-
-function sendMultipleTasks(api: TodoistApi,
-                           projects: TodoistProject[],
-                           task_strings: string[]) {
-  for (const task_string of task_strings) {
-    sendTask(api, projects, task_string)
-  }
-}
-
-
-async function findAndSendTasks(api: TodistApi, text: string) {
-  const tasks = findTasks(text);
-  let projects: TodoistProject[];
-  
-  if (tasks.length === 0) {
-    new Notice('No tasks found');
-
-  } else if (tasks.length === 1) {
-    projects = await getProjects(api);
-    await sendTask(api, projects, tasks[0]);
-
-  } else {
-    projects = await getProjects(api);
-    new Notice(projects)
-    await sendMultipleTasks(api, projects, tasks);
-  }
-
-}
-
-
-
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
 
+  testMethod() {
+    console.log(this.settings.dueLanguage)
+    console.log(this.settings.taskPattern)
+  }
+
+  testMethod2() {
+    this.testMethod()
+  }
+
+
 	async onload() {
 		await this.loadSettings();
+
+		// This adds a settings tab so the user can configure various aspects of the plugin
+		this.addSettingTab(new MySettingTab(this.app, this));
     
     this.api = new TodoistApi(this.settings.apiToken);
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Send to Todoist', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('dice', 'Send to Todoist', async (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
       const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
-      fileContents = editor.getValue();
-      findAndSendTasks(this.api, fileContents);
+      const fileContents = await editor.getValue();
+      findAndSendTasks(this.api, 
+                       fileContents,
+                       this.settings.dueLanguage);
 		});
     
 		// Perform additional things with the ribbon
+    this.addCommand({
+      id: 'todoist-test',
+      name: 'Test',
+      Callback: () => {
+        this.testMethod2();
+      }
+    });
 		
    
 		this.addCommand({
 			id: 'todoist-sync',
 			name: 'Sync with Todoist',
-			Callback: () => {
+			Callback: async () => {
 
         if (!navigator.onLine) {
           new Notice('No active internet connection.');
@@ -181,18 +227,19 @@ export default class MyPlugin extends Plugin {
 
         const vault = this.app.vault;
         const files = vault.getMarkdownFiles();
-        const todoistPattern = /{{todoist}}/i;
+
         
         var task_counter = 0;
         for (const file of files) {
           const fileContents = await vault.read(file);
-          if (todoistPattern.test(fileContents)) {
+          if (this.settings.todoistPattern.test(fileContents)) {
+
             // Remove the pattern from file contents
-            const updatedContents = fileContents.replace(todoistPattern, '');
+            const updatedContents = fileContents.replace(this.settings.todoistPattern, '');
 
             // Send the file contents to Todoist
             try {
-              await findAndSendTasks(this.api, updatedContents)
+              await findAndSendTasks(updatedContents, this.settings.dueLanguage)
               task_counter += 1;
             } catch (error) {
               new Notice(`Error sending ${file.path} to Todoist: ${error}`);
@@ -210,7 +257,7 @@ export default class MyPlugin extends Plugin {
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
         const selection = editor.getSelection();
         try {
-          await sendTask(this.api, selection);
+          await sendTask(this.api, selection, this.settings.dueLanguage);
         }
         catch (e) {
           new Notice(e);
@@ -225,7 +272,7 @@ export default class MyPlugin extends Plugin {
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
         const fileContents = await editor.getValue();
         try {
-          await findAndSendTasks(this.api, fileContents);
+          await findAndSendTasks(this.api, fileContents, this.dueLanguage);
         }
         catch (e) {
           new Notice(e);
@@ -234,17 +281,8 @@ export default class MyPlugin extends Plugin {
 		});
 
 
-    // this.addCommand({
-    //     id: 'todoist-new',
-    //     name: 'New Todoist task',
-    //     callback: () => {
-    //       // TODO: implement new
-    //     },
-    // });
 
     //
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new MySettingTab(this.app, this));
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
