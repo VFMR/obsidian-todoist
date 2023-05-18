@@ -71,9 +71,10 @@ function findPriority(task: string): number {
 
 
 function findDueDate(task: string): string {
-  const dueDate = task.match(/due: .*(,|$)/);
+  // FIXME - this only allows for due dates without spaces
+  const dueDate = task.match(/due: .*/);
   if (dueDate) {
-    return dueDate[0].slice(5, -1);
+    return dueDate[0].slice(5);
   } else {
     return null;
   }
