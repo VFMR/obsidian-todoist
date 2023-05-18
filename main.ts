@@ -25,16 +25,25 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 }
 
 
-// function to find all the tasks in the current file
-// returns an array of strings
-function findTasks(editor: Editor): string[] {
-  const tasks = editor.getValue().match(/- \[.\] .*(\n|$)/g);
+// // find all the tasks in the current file
+// function findTasks(editor: Editor): string[] {
+//   const tasks = editor.getValue().match(/- \[.\] .*(\n|$)/g);
+//   if (tasks) {
+//     return tasks;
+//   } else {
+//     return [];
+//   }
+//   new Notice(tasks);
+// }
+
+
+function findTasks(text: string): string[] {
+  const tasks = text.match(/- \[.\] .*(\n|$)/g);
   if (tasks) {
     return tasks;
   } else {
     return [];
   }
-  new Notice(tasks);
 }
 
 
@@ -84,6 +93,11 @@ function findDueDate(task: string): string {
 
 function makeTask(projects: TodoistProject[], 
                   task_string: string): TodoistTask {
+    // TODO: add support for labels
+    // TODO: add support for description
+    // TODO: add support for assignee
+    // TODO: add support for due dates with spaces
+    // TODO: fix project_id recognition 
     const task: TodoistTask = {
     "content": task_string.replace(/^- \[ \]/, '').replace('\n', ''),
     "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
@@ -96,15 +110,6 @@ function makeTask(projects: TodoistProject[],
   return task;
 }
 
-
-// function makeMultipleTasks(projects: TodoistProject[], 
-//                            tasks: string[]): TodoistTask[] {
-//   const task_objects = TodoistTask[];
-//   for (const task of tasks) {
-//     task_objects.push(makeTask(task));
-//   }
-//   return task_objects;
-// }
 
 
 function sendTask(api: TodoistApi,
@@ -124,8 +129,8 @@ function sendMultipleTasks(api: TodoistApi,
 }
 
 
-async function findAndSendTasks(api: TodistApi, editor: Editor) {
-  const tasks = findTasks(editor);
+async function findAndSendTasks(api: TodistApi, text: string) {
+  const tasks = findTasks(text);
   let projects: TodoistProject[];
   
   if (tasks.length === 0) {
@@ -157,20 +162,46 @@ export default class MyPlugin extends Plugin {
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Send to Todoist', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
       const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
-      findAndSendTasks(this.api, editor);
+      fileContents = editor.getValue();
+      findAndSendTasks(this.api, fileContents);
 		});
     
 		// Perform additional things with the ribbon
 		
    
-		// this.addCommand({
-		// 	id: 'todoist-sync',
-		// 	name: 'Sync with Todoist',
-		// 	editorCallback: (editor: Editor, view: MarkdownView) => {
-		//
-	 //        // TODO: implement sync
-		// 	}
-		// });
+		this.addCommand({
+			id: 'todoist-sync',
+			name: 'Sync with Todoist',
+			Callback: () => {
+
+        if (!navigator.onLine) {
+          new Notice('No active internet connection.');
+          return;
+        }
+
+        const vault = this.app.vault;
+        const files = vault.getMarkdownFiles();
+        const todoistPattern = /{{todoist}}/i;
+        
+        var task_counter = 0;
+        for (const file of files) {
+          const fileContents = await vault.read(file);
+          if (todoistPattern.test(fileContents)) {
+            // Remove the pattern from file contents
+            const updatedContents = fileContents.replace(todoistPattern, '');
+
+            // Send the file contents to Todoist
+            try {
+              await findAndSendTasks(this.api, updatedContents)
+              task_counter += 1;
+            } catch (error) {
+              new Notice(`Error sending ${file.path} to Todoist: ${error}`);
+            }
+          }
+        }
+        new Notice(`Sent ${task_counter} tasks to Todoist.`);
+      }
+		});
 
 
 		this.addCommand({
@@ -192,8 +223,9 @@ export default class MyPlugin extends Plugin {
 			id: 'todoist-send-file',
 			name: 'Send file to Todoist',
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
+        const fileContents = await editor.getValue();
         try {
-          await findAndSendTasks(this.api, editor);
+          await findAndSendTasks(this.api, fileContents);
         }
         catch (e) {
           new Notice(e);
