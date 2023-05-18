@@ -61,14 +61,13 @@ async function getProjectId(projects: TodoistProject[], project_name: string): s
 
 function findPriority(task: string): number {
   const priority = task.match(/p\d/);
+  var prio_num = 4;
   // return integer
   if (priority) {
-    const prio_num = parseInt(priority[0].slice(1));
-  } else {
-    prio_num =  4;
-  }
+    prio_num = parseInt(priority[0].slice(1));
+  } 
   // reverse numbers to be consistent with app, where 1 is highest priority:
-  return 5 - prio_num;
+  return parseInt(5 - prio_num);
 }
 
 
