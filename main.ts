@@ -1,7 +1,18 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 
 import {MySettingTab} from './settings'
-import {createTask} from './todoist-api'
+import {createTask, TodoistProject} from './todoist-api'
+
+
+interface TodoistTask {
+  content: string;
+  project_id: string;
+  project_name: string;
+  priority: number;
+  due_string: string;
+  due_lang: string;
+}
+
 
 // function to find all the tasks in the current file
 // returns an array of strings
@@ -13,6 +24,25 @@ function findTasks() {
   } else {
     return [];
   }
+}
+
+
+// function to get project id from project name
+async function getProjectId(projects: TodoistProject[], project_name: string): string {
+    var project_id = 0;
+
+    // find the name most similar to the project_name
+    if (project_name != null) {
+      for (var i = 0; i < projects.length; i++) {
+        var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        if (project_name_clean2.includes(project_name_clean)) {
+          project_id = projects[i].id;
+          break;
+        }
+      }
+    }
+    return project_id;
 }
 
 
@@ -37,17 +67,20 @@ function findDueDate(task: string) {
 }
 
 
-function makeTask(task_string: string) {
-  return {
-      content: task_string.replace(/^- \[ \]/, '').replace('\n', ''),
-      project_name: task_string.match(/#.*(\s|$)/),
-      priority: findPriority(task_string),
-      due_string: findDueDate(task_string),
+function makeTask(projects: TodoistProject[], 
+                  task_string: string): TodoistTask {
+  return TodoistTask = {
+    content: task_string.replace(/^- \[ \]/, '').replace('\n', ''),
+    project_id: getProjectId(projects, task_string.match(/#.*(\s|$)/)),
+    project_name: task_string.match(/#.*(\s|$)/),
+    priority: findPriority(task_string),
+    due_string: findDueDate(task_string),
+    due_lang: "de",
   };
 }
 
 
-function makeMultipleTasks(tasks: string[]) {
+function makeMultipleTasks(tasks: string[]): TodoistTask[] {
   const task_objects = [];
   for (const task of tasks) {
     task_objects.push(makeTask(task));
@@ -76,6 +109,7 @@ interface MyPluginSettings {
 const DEFAULT_SETTINGS: MyPluginSettings = {
   apiToken: '',
 }
+
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
