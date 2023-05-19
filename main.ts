@@ -169,9 +169,6 @@ function updateTaskRowEditor(tdTask: TodoistTask, taskId: string, editor: Editor
   // update line in the text:
   editor.replaceRange(updatedTaskLine, { line: tdTask.textRow, ch: 0 }, { line: tdTask.textRow + 1, ch: 0 });
 }
-  
- 
-
 
 
 function findPriority(task: string): number {
@@ -214,7 +211,6 @@ function makeTask(projects: TodoistProject[],
                   descripton: string,
                   textRow: number): TodoistTask {
     // TODO: add support for labels
-    // TODO: add support for description
     // TODO: add support for assignee
     // TODO: add support for due dates with spaces
     // TODO: fix project_id recognition 
@@ -233,30 +229,10 @@ function makeTask(projects: TodoistProject[],
 }
 
 
-
-function sendTask(api: TodoistApi,
-                  projects: TodoistProject[], 
-                  task_string: string,
-                  dueLanguage: string) {
-  const task = makeTask(projects, task_string, dueLanguage);
-  createTask(api, task);
-}
-
-
-// function sendMultipleTasks(api: TodoistApi,
-//                            projects: TodoistProject[],
-//                            task_strings: string[],
-//                            dueLanguage: string) {
-//   for (const task_string of task_strings) {
-//     sendTask(api, projects, task_string, dueLanguage)
-//   }
-// }
-
-
 async function findAndSendTasks(api: TodistApi,
                                 text: string,
                                 dueLanguage: string) {
-  const tasks_object = findTasksWithContext(text, dueLanguage);
+  const tasks_objects = findTasksWithContext(text, dueLanguage);
   let projects: TodoistProject[];
   
   if (tasks.length === 0) {
@@ -264,15 +240,15 @@ async function findAndSendTasks(api: TodistApi,
 
   } else if (tasks.length === 1) {
     projects = await getProjects(api);
-    await sendTask(api, projects, tasks[0], dueLanguage);
-
+    const response = await createTask(api, tasks[0]);
   } else {
     projects = await getProjects(api);
-    new Notice(projects)
-    await sendMultipleTasks(api, projects, tasks, dueLanguage);
+    for (const task of tasks) {
+      const response = await createTask(api, task);
+    }
   }
-
 }
+
 
 // function to get project id from project name
 async function getProjectId(projects: TodoistProject[], project_name: string): string {
