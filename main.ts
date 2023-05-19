@@ -38,8 +38,8 @@ interface TodoistTask {
 const DEFAULT_PATTERNS = {
   taskPattern: /- \[ \] .*(\n|$)/g,
   taskRemovePattern: /- \[ \] /g,
-  duePattern: /((due: )|(📅 ))(.*)(\n|$)/g,
-  dueRemovePattern: /due: /g,
+  duePattern: /((due: )|(📅 ))([a-zA-Z0-9\-\.]+)/g,
+  dueRemovePattern: /((due: )|(📅 ))/g,
   syncPattern: /{{todoist}}/g,
 }
 
@@ -88,22 +88,25 @@ function findTasksWithContext(projects: TodoistProject[],
   let taskRow = null;
   let row = 0;
 
-  // empty line -> push task to tasks
   for (const line of lines) {
-    if (line.trim() === '') {
-      if (task_string !== '') {
-        tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
 
-        tasks.push(tdTask);
-        task_string = '';
-        indentLevel = 0;
-        taskDescription = '';
-        taskRow = null;
+    // empty line -> push task to tasks
+    if (line.trim() === '') {
+      if (!isInCodeBlock) {  // allow for empty lines in code blocks
+        if (task_string !== '') {
+          tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
+
+          tasks.push(tdTask);
+          task_string = '';
+          indentLevel = 0;
+          taskDescription = '';
+          taskRow = null;
+        }
+        continue;
       }
-      continue;
     }
 
-    // Starting code block
+    // Starting and ending code blocks
     const codeBlockStart = line.match(/^```(?:([a-zA-Z0-9]+))?$/);
     if (codeBlockStart) {
       // ending code block?
@@ -114,6 +117,9 @@ function findTasksWithContext(projects: TodoistProject[],
         }
       } else {
         isInCodeBlock = codeBlockStart[1] || true; // Entering a new code block
+        if (task_string !== '') {
+          taskDescription += line + '\n';
+        }
       }
       continue;
     }
@@ -121,7 +127,9 @@ function findTasksWithContext(projects: TodoistProject[],
     // add line if inside a code block
     if (isInCodeBlock) {
       if (task_string !== '') {
-        taskDescription += line + '\n';
+        // TODO: line.trim() sets everything to the same indent level. 
+        // Ideally, one should only remove the indent level of the task line
+        taskDescription += line.trim() + '\n';
       }
       continue;
     }
@@ -131,12 +139,15 @@ function findTasksWithContext(projects: TodoistProject[],
     if (match) {
       const currentIndentLevel = match[1].length;
       if (task_string === '') {
-        task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
-        indentLevel = currentIndentLevel;
-        taskRow = row;
+        task_match = line.match(DEFAULT_PATTERNS.taskPattern);
+        if (task_match) {
+          task_string = task_match[0];
+          indentLevel = currentIndentLevel;
+          taskRow = row;
+        }
       }
       else if (currentIndentLevel > indentLevel) {
-        taskDescription += match[2].trim() + '\n';
+        taskDescription += line + '\n';
       }
       else {
         tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
@@ -147,6 +158,7 @@ function findTasksWithContext(projects: TodoistProject[],
         taskRow = null;
       }
     }
+
     row += 1;
   }
 
@@ -161,10 +173,10 @@ function findTasksWithContext(projects: TodoistProject[],
 
 
 function updateTaskRowEditor(tdTask: TodoistTask, taskId: string, editor: Editor) {
-  const tdIDString = ' {{todoist-id' + taskId + '}}'
+  const tdIDString = ' {{todoist-id' + taskId + '}}';
 
-  const currentTaskLine = editor.getLine(tdTask.textRow)
-  const updatedTaskLine = currentTaskLine + tdIDString
+  const currentTaskLine = editor.getLine(tdTask.textRow);
+  const updatedTaskLine = currentTaskLine + tdIDString;
 
   // update line in the text:
   editor.replaceRange(updatedTaskLine, { line: tdTask.textRow, ch: 0 }, { line: tdTask.textRow + 1, ch: 0 });
@@ -188,7 +200,8 @@ function findPriority(task: string): number {
       prio_num = 4;
     } else {
       prio_num = parseInt(priority[0].slice(1));
-  } 
+    } 
+  }
   // reverse numbers to be consistent with app, where 1 is highest priority:
   return parseInt(5 - prio_num);
 }
@@ -198,7 +211,7 @@ function findDueDate(task: string): string {
   // FIXME - this only allows for due dates without spaces
   const dueDate = task.match(DEFAULT_PATTERNS.duePattern);
   if (dueDate) {
-    return dueDate[0].replace(DEFAULT_PATTERNS.dueRemovePattern, '')
+    return dueDate[0].replace(DEFAULT_PATTERNS.dueRemovePattern, '');
   } else {
     return null;
   }
@@ -216,7 +229,7 @@ function makeTask(projects: TodoistProject[],
     // TODO: fix project_id recognition 
     const task: TodoistTask = {
     "content": task_string.replace(DEFAULT_PATTERNS.taskRemovePattern, '').replace('\n', ''),
-    "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
+    // "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
     "project_name": task_string.match(/#.*(\s|$)/),
     "priority": findPriority(task_string),
     "due_string": findDueDate(task_string),
@@ -232,8 +245,8 @@ function makeTask(projects: TodoistProject[],
 async function findAndSendTasks(api: TodistApi,
                                 text: string,
                                 dueLanguage: string) {
-  const tasks_objects = findTasksWithContext(text, dueLanguage);
   let projects: TodoistProject[];
+  const tasks = findTasksWithContext(projects, dueLanguage, text);
   
   if (tasks.length === 0) {
     new Notice('No tasks found');
@@ -247,27 +260,28 @@ async function findAndSendTasks(api: TodistApi,
       const response = await createTask(api, task);
     }
   }
+  return response;
 }
 
 
 // function to get project id from project name
 async function getProjectId(projects: TodoistProject[], project_name: string): string {
-    var project_id = "0";
+  var project_id = "0";
 
-    // find the name most similar to the project_name
-    if (project_name != null) {
-      if (project_name != "") {
-        for (var i = 0; i < projects.length; i++) {
-          var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-          var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
-          if (project_name_clean2.includes(project_name_clean)) {
-            project_id = projects[i].id;
-            break;
-          }
+  // find the name most similar to the project_name
+  if (project_name != null) {
+    if (project_name != "") {
+      for (var i = 0; i < projects.length; i++) {
+        var project_name_clean = project_name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        var project_name_clean2 = projects[i].name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+        if (project_name_clean2.includes(project_name_clean)) {
+          project_id = projects[i].id;
+          break;
         }
       }
     }
-    return project_id;
+  }
+  return project_id;
 }
 
 
@@ -318,7 +332,7 @@ export default class MyPlugin extends Plugin {
 
             // Send the file contents to Todoist
             try {
-              await findAndSendTasks(updatedContents, this.settings.dueLanguage)
+              await findAndSendTasks(this.api, updatedContents, this.settings.dueLanguage)
               task_counter += 1;
             } catch (error) {
               new Notice(`Error sending ${file.path} to Todoist: ${error}`);
@@ -330,19 +344,19 @@ export default class MyPlugin extends Plugin {
 		});
 
 
-		this.addCommand({
-			id: 'todoist-send-selection',
-			name: 'Send selection to Todoist',
-			editorCallback: async (editor: Editor, view: MarkdownView) => {
-        const selection = editor.getSelection();
-        try {
-          await sendTask(this.api, selection, this.settings.dueLanguage);
-        }
-        catch (e) {
-          new Notice(e);
-			  }
-      }
-		});
+		// this.addCommand({
+		// 	id: 'todoist-send-selection',
+		// 	name: 'Send selection to Todoist',
+		// 	editorCallback: async (editor: Editor, view: MarkdownView) => {
+  //       const selection = editor.getSelection();
+  //       try {
+  //         await sendTask(this.api, selection, this.settings.dueLanguage);
+  //       }
+  //       catch (e) {
+  //         new Notice(e);
+		// 	  }
+  //     }
+		// });
 
 
 		this.addCommand({
@@ -351,7 +365,7 @@ export default class MyPlugin extends Plugin {
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
         const fileContents = await editor.getValue();
         try {
-          await findAndSendTasks(this.api, fileContents, this.dueLanguage);
+          response = await findAndSendTasks(this.api, fileContents, this.settings.dueLanguage, editor);
         }
         catch (e) {
           new Notice(e);
