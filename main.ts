@@ -76,76 +76,101 @@ function findTasks(text: string): string[] {
 
 function findTasksWithContext(projects: TodoistProject[],
                               dueLanguage: string,
-                              text: string): string[] {
+                              text: string): TodoistTask[] {
   const lines = text.split('\n');
   let tasks: TodoistTask[] = []; 
+  let tdTask: TodoistTask | null = null;
   let task_string = '';
   let indentLevel = 0;
   let taskDescription = '';
   let isInCodeBlock = false;
+  let taskLine = null;
+  let taskRow = null;
+  let row = 0;
 
   // empty line -> push task to tasks
   for (const line of lines) {
     if (line.trim() === '') {
       if (task_string !== '') {
-        const tdTask = makeTask(projects, task_string, dueLanguage, taskDescription);
+        tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
 
         tasks.push(tdTask);
         task_string = '';
         indentLevel = 0;
         taskDescription = '';
+        taskRow = null;
       }
       continue;
     }
 
+    // Starting code block
     const codeBlockStart = line.match(/^```(?:([a-zA-Z0-9]+))?$/);
-      if (codeBlockStart) {
-        if (isInCodeBlock) {
-          isInCodeBlock = false; // Exiting an existing code block
-          if (task_string !== '') {
-            taskDescription += line + '\n';
-        } else {
-          isInCodeBlock = codeBlockStart[1] || true; // Entering a new code block
-        }
-        continue;
-      }
-
-      // Skip processing the line if inside a code block
+    if (codeBlockStart) {
+      // ending code block?
       if (isInCodeBlock) {
+        isInCodeBlock = false; // Exiting an existing code block
         if (task_string !== '') {
           taskDescription += line + '\n';
         }
+      } else {
+        isInCodeBlock = codeBlockStart[1] || true; // Entering a new code block
       }
+      continue;
+    }
+
+    // add line if inside a code block
+    if (isInCodeBlock) {
+      if (task_string !== '') {
+        taskDescription += line + '\n';
+      }
+      continue;
+    }
 
     // check if line is a task or a description
     const match = line.match(/^(\s*-+)\s*(.*)/);
-      if (match) {
-        const currentIndentLevel = match[1].length;
-        if (task_string === '') {
-          task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
-          indentLevel = currentIndentLevel;
-        }
-        else if (currentIndentLevel > indentLevel) {
-          taskDescription += match[2].trim() + '\n';
-        }
-        else {
-          const tdTask = makeTask(projects, task_string, dueLanguage, taskDescription);
-          tasks.push(tdTask);
-          task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
-          indentLevel = currentIndentLevel;
-          taskDescription = '';
-        }
+    if (match) {
+      const currentIndentLevel = match[1].length;
+      if (task_string === '') {
+        task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
+        indentLevel = currentIndentLevel;
+        taskRow = row;
       }
+      else if (currentIndentLevel > indentLevel) {
+        taskDescription += match[2].trim() + '\n';
+      }
+      else {
+        tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
+        tasks.push(tdTask);
+        task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
+        indentLevel = currentIndentLevel;
+        taskDescription = '';
+        taskRow = null;
+      }
+    }
+    row += 1;
   }
 
   // push last task
   if (task_string !== '') {
-    const tdTask = makeTask(projects, task_string, dueLanguage, taskDescription);
+    tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
     tasks.push(tdTask);
   }
 
   return tasks;
 }
+
+
+function updateTaskRowEditor(tdTask: TodoistTask, taskId: string, editor: Editor) {
+  const tdIDString = ' {{todoist-id' + taskId + '}}'
+
+  const currentTaskLine = editor.getLine(tdTask.textRow)
+  const updatedTaskLine = currentTaskLine + tdIDString
+
+  // update line in the text:
+  editor.replaceRange(updatedTaskLine, { line: tdTask.textRow, ch: 0 }, { line: tdTask.textRow + 1, ch: 0 });
+}
+  
+ 
 
 
 
@@ -186,7 +211,8 @@ function findDueDate(task: string): string {
 function makeTask(projects: TodoistProject[], 
                   task_string: string,
                   dueLanguage: string,
-                  descripton: string): TodoistTask {
+                  descripton: string,
+                  textRow: number): TodoistTask {
     // TODO: add support for labels
     // TODO: add support for description
     // TODO: add support for assignee
@@ -199,6 +225,8 @@ function makeTask(projects: TodoistProject[],
     "priority": findPriority(task_string),
     "due_string": findDueDate(task_string),
     "due_lang": dueLanguage,
+    "description": descripton,
+    "textRow": textRow
     };
   new Notice(task)
   return task;
@@ -215,20 +243,20 @@ function sendTask(api: TodoistApi,
 }
 
 
-function sendMultipleTasks(api: TodoistApi,
-                           projects: TodoistProject[],
-                           task_strings: string[],
-                           dueLanguage: string) {
-  for (const task_string of task_strings) {
-    sendTask(api, projects, task_string, dueLanguage)
-  }
-}
+// function sendMultipleTasks(api: TodoistApi,
+//                            projects: TodoistProject[],
+//                            task_strings: string[],
+//                            dueLanguage: string) {
+//   for (const task_string of task_strings) {
+//     sendTask(api, projects, task_string, dueLanguage)
+//   }
+// }
 
 
 async function findAndSendTasks(api: TodistApi,
                                 text: string,
                                 dueLanguage: string) {
-  const tasks = findTasks(text);
+  const tasks_object = findTasksWithContext(text, dueLanguage);
   let projects: TodoistProject[];
   
   if (tasks.length === 0) {
