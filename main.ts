@@ -28,11 +28,17 @@ interface TodoistTask {
 };
 
 
-// TODO: add as parameters to the plugin settings instead of hardcoding
+// TODO: add as parameters to the plugin settings instead of hardcoding.
+// requires me to specify the patterns in strings, with double backslashes 
+// (i.e. '- \\[ \\] ') for the regex to work. and then use 
+// ` new RegExp(string_pattern, 'g') `
+// to create a regex 
+// I can create such an escaped pattern from a regular regex entry with this:
+// userPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const DEFAULT_PATTERNS = {
-  taskPattern: '/- \[ \] .*(\n|$)/g',
+  taskPattern: /- \[ \] .*(\n|$)/g,
   taskRemovePattern: /- \[ \] /g,
-  duePattern: /due: .*(\n|$)/g,
+  duePattern: /((due: )|(📅 ))(.*)(\n|$)/g,
   dueRemovePattern: /due: /g,
   syncPattern: /{{todoist}}/g,
 }
@@ -68,12 +74,98 @@ function findTasks(text: string): string[] {
 }
 
 
+function findTasksWithContext(projects: TodoistProject[],
+                              dueLanguage: string,
+                              text: string): string[] {
+  const lines = text.split('\n');
+  let tasks: TodoistTask[] = []; 
+  let task_string = '';
+  let indentLevel = 0;
+  let taskDescription = '';
+  let isInCodeBlock = false;
+
+  // empty line -> push task to tasks
+  for (const line of lines) {
+    if (line.trim() === '') {
+      if (task_string !== '') {
+        const tdTask = makeTask(projects, task_string, dueLanguage, taskDescription);
+
+        tasks.push(tdTask);
+        task_string = '';
+        indentLevel = 0;
+        taskDescription = '';
+      }
+      continue;
+    }
+
+    const codeBlockStart = line.match(/^```(?:([a-zA-Z0-9]+))?$/);
+      if (codeBlockStart) {
+        if (isInCodeBlock) {
+          isInCodeBlock = false; // Exiting an existing code block
+          if (task_string !== '') {
+            taskDescription += line + '\n';
+        } else {
+          isInCodeBlock = codeBlockStart[1] || true; // Entering a new code block
+        }
+        continue;
+      }
+
+      // Skip processing the line if inside a code block
+      if (isInCodeBlock) {
+        if (task_string !== '') {
+          taskDescription += line + '\n';
+        }
+      }
+
+    // check if line is a task or a description
+    const match = line.match(/^(\s*-+)\s*(.*)/);
+      if (match) {
+        const currentIndentLevel = match[1].length;
+        if (task_string === '') {
+          task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
+          indentLevel = currentIndentLevel;
+        }
+        else if (currentIndentLevel > indentLevel) {
+          taskDescription += match[2].trim() + '\n';
+        }
+        else {
+          const tdTask = makeTask(projects, task_string, dueLanguage, taskDescription);
+          tasks.push(tdTask);
+          task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
+          indentLevel = currentIndentLevel;
+          taskDescription = '';
+        }
+      }
+  }
+
+  // push last task
+  if (task_string !== '') {
+    const tdTask = makeTask(projects, task_string, dueLanguage, taskDescription);
+    tasks.push(tdTask);
+  }
+
+  return tasks;
+}
+
+
+
 function findPriority(task: string): number {
-  const priority = task.match(/p\d/);
+  // match either /p\d/ or "⏫", "🔼", "🔽 ", or "⏬"
+  const priority = task.match(/(p\d|⏫|🔼|🔽|⏬)/);
+
   var prio_num = 4;
   // return integer
   if (priority) {
-    prio_num = parseInt(priority[0].slice(1));
+    if (priority[0] === '⏫') {
+      prio_num = 1;
+    } else if (priority[0] === '🔼') {
+      prio_num = 2;
+    } else if (priority[0] === '🔽') {
+      prio_num = 3;
+    } else if (priority[0] === '⏬') {
+      prio_num = 4;
+    } else {
+      prio_num = parseInt(priority[0].slice(1));
   } 
   // reverse numbers to be consistent with app, where 1 is highest priority:
   return parseInt(5 - prio_num);
@@ -93,7 +185,8 @@ function findDueDate(task: string): string {
 
 function makeTask(projects: TodoistProject[], 
                   task_string: string,
-                  dueLanguage): TodoistTask {
+                  dueLanguage: string,
+                  descripton: string): TodoistTask {
     // TODO: add support for labels
     // TODO: add support for description
     // TODO: add support for assignee
