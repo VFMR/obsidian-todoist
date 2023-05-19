@@ -80,15 +80,15 @@ function findTasksWithContext(projects: TodoistProject[],
   const lines = text.split('\n');
   let tasks: TodoistTask[] = []; 
   let tdTask: TodoistTask | null = null;
-  let task_string = '';
-  let indentLevel = 0;
-  let taskDescription = '';
-  let isInCodeBlock = false;
-  let taskLine = null;
-  let taskRow = null;
-  let row = 0;
+  let task_string: string = '';
+  let indentLevel: number = 0;
+  let taskDescription: string = '';
+  let isInCodeBlock: boolean = false;
+  let taskRow: number | null = null;
+  let row: number = -1;
 
   for (const line of lines) {
+    row += 1;
 
     // empty line -> push task to tasks
     if (line.trim() === '') {
@@ -138,6 +138,8 @@ function findTasksWithContext(projects: TodoistProject[],
     const match = line.match(/^(\s*-+)\s*(.*)/);
     if (match) {
       const currentIndentLevel = match[1].length;
+
+      // Check for new tasks
       if (task_string === '') {
         task_match = line.match(DEFAULT_PATTERNS.taskPattern);
         if (task_match) {
@@ -145,21 +147,27 @@ function findTasksWithContext(projects: TodoistProject[],
           indentLevel = currentIndentLevel;
           taskRow = row;
         }
-      }
-      else if (currentIndentLevel > indentLevel) {
+
+      // Check for subordinate bullet points
+      } else if (currentIndentLevel > indentLevel) {
         taskDescription += line + '\n';
-      }
-      else {
+
+      // Otherwise, create the task
+      } else {
         tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
         tasks.push(tdTask);
-        task_string = line.match(DEFAULT_PATTERNS.taskPattern)[0];
+
+        // Check if the line contains a new task instead
+        task_match = line.match(DEFAULT_PATTERNS.taskPattern);
+        if (task_match) {
+          task_string = task_match[0];
+          indentLevel = currentIndentLevel;
+          taskRow = row;
+        }
         indentLevel = currentIndentLevel;
         taskDescription = '';
-        taskRow = null;
       }
     }
-
-    row += 1;
   }
 
   // push last task
@@ -173,13 +181,14 @@ function findTasksWithContext(projects: TodoistProject[],
 
 
 function updateTaskRowEditor(tdTask: TodoistTask, taskId: string, editor: Editor) {
-  const tdIDString = ' {{todoist-id' + taskId + '}}';
+  const tdIDString = ' %%{{todoist-id' + taskId + '}}%%';
 
   const currentTaskLine = editor.getLine(tdTask.textRow);
   const updatedTaskLine = currentTaskLine + tdIDString;
 
   // update line in the text:
-  editor.replaceRange(updatedTaskLine, { line: tdTask.textRow, ch: 0 }, { line: tdTask.textRow + 1, ch: 0 });
+  const endPosition = { line: tdTask.textRow, ch: currentTaskLine.length };
+  editor.replaceRange(updatedTaskLine, { line: tdTask.textRow, ch: 0 }, endPosition);
 }
 
 
@@ -244,7 +253,8 @@ function makeTask(projects: TodoistProject[],
 
 async function findAndSendTasks(api: TodistApi,
                                 text: string,
-                                dueLanguage: string) {
+                                dueLanguage: string,
+                                editor?: Editor) {
   let projects: TodoistProject[];
   const tasks = findTasksWithContext(projects, dueLanguage, text);
   
@@ -254,13 +264,19 @@ async function findAndSendTasks(api: TodistApi,
   } else if (tasks.length === 1) {
     projects = await getProjects(api);
     const response = await createTask(api, tasks[0]);
+    if (editor) {
+      updateTaskRowEditor(tasks[0], response.id, editor)
+    }
   } else {
     projects = await getProjects(api);
     for (const task of tasks) {
       const response = await createTask(api, task);
+      if (editor) {
+        updateTaskRowEditor(task, response.id, editor)
+      }
+
     }
   }
-  return response;
 }
 
 
@@ -304,7 +320,8 @@ export default class MyPlugin extends Plugin {
       const fileContents = await editor.getValue();
       findAndSendTasks(this.api, 
                        fileContents,
-                       this.settings.dueLanguage);
+                       this.settings.dueLanguage,
+                       editor);
 		});
     
    
@@ -365,7 +382,7 @@ export default class MyPlugin extends Plugin {
 			editorCallback: async (editor: Editor, view: MarkdownView) => {
         const fileContents = await editor.getValue();
         try {
-          response = await findAndSendTasks(this.api, fileContents, this.settings.dueLanguage, editor);
+          await findAndSendTasks(this.api, fileContents, this.settings.dueLanguage, editor);
         }
         catch (e) {
           new Notice(e);
