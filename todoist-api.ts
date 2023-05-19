@@ -41,6 +41,7 @@ export async function createTask(api: TodoistApi, task: TodoistTask) {
     // project_id: task.project_id,
     due_string: task.due_string,
     due_lang: task.due_lang,
+    description: task.description,
   });
   return response;
 }
