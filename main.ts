@@ -2,7 +2,7 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Set
 import { TodoistApi } from "@doist/todoist-api-typescript";
 
 import {MySettingTab} from './settings';
-import {getProjects, createTask, TodoistProject} from './todoist-api';
+import {getProjects, getActiveTasks, createTask, TodoistProject} from './todoist-api';
 
 
 
@@ -41,6 +41,7 @@ const DEFAULT_PATTERNS = {
   duePattern: /((due: )|(📅 ))([a-zA-Z0-9\-\.]+)/g,
   dueRemovePattern: /((due: )|(📅 ))/g,
   syncPattern: /{{todoist}}/g,
+  todoistIdPattern: /{{todoist-id[0-9]+}}/g,
 }
 
 
@@ -75,11 +76,13 @@ function findTasks(text: string): string[] {
 
 
 function findTasksWithContext(projects: TodoistProject[],
+                              activeTasks: string[],
                               dueLanguage: string,
-                              text: string): TodoistTask[] {
+                              text: string) {
   const lines = text.split('\n');
-  let tasks: TodoistTask[] = []; 
   let tdTask: TodoistTask | null = null;
+  let tasks: TodoistTask[] = []; 
+  let completedTasks: number[] = [];
   let task_string: string = '';
   let indentLevel: number = 0;
   let taskDescription: string = '';
@@ -143,9 +146,23 @@ function findTasksWithContext(projects: TodoistProject[],
       if (task_string === '') {
         task_match = line.match(DEFAULT_PATTERNS.taskPattern);
         if (task_match) {
-          task_string = task_match[0];
-          indentLevel = currentIndentLevel;
-          taskRow = row;
+          // check if task has a todoist id  
+          const id_match = line.match(/{{todoist_id(\d+)}}/);
+          if (id_match) {
+            task_id = id_match[1];
+            new Notice(task_id);
+            // check if this is an active task
+            if (activeTasks.includes(task_id)) {
+              continue;
+            } else {
+              completedTasks.push(row)
+            }
+          
+          // handling of new tasks
+          } else {
+            task_string = task_match[0];
+            indentLevel = currentIndentLevel;
+            taskRow = row;
         }
 
       // Check for subordinate bullet points
@@ -176,7 +193,12 @@ function findTasksWithContext(projects: TodoistProject[],
     tasks.push(tdTask);
   }
 
-  return tasks;
+  allTasks = {
+    completedTasks: completedTasks,
+    newTasks: tasks
+  }
+
+  return allTasks;
 }
 
 
@@ -189,6 +211,13 @@ function updateTaskRowEditor(tdTask: TodoistTask, taskId: string, editor: Editor
   // update line in the text:
   const endPosition = { line: tdTask.textRow, ch: currentTaskLine.length };
   editor.replaceRange(updatedTaskLine, { line: tdTask.textRow, ch: 0 }, endPosition);
+}
+
+
+function markTaskAsCompleted(row, editor: Editor) {
+  const currentTaskLine = editor.getLine(row);
+  const updatedTaskLine = currentTaskLine.replace('[ ]', '[x]')
+  editor.replaceRange(updatedTaskLine, { line: row, ch: 0 }, { line: row, ch: currentTaskLine.length });
 }
 
 
@@ -255,26 +284,39 @@ async function findAndSendTasks(api: TodistApi,
                                 text: string,
                                 dueLanguage: string,
                                 editor?: Editor) {
+  // TODO: currently only works with for the active file, not the vault
   let projects: TodoistProject[];
-  const tasks = findTasksWithContext(projects, dueLanguage, text);
+  const allTasks = findTasksWithContext(projects, dueLanguage, text);
+  const newTasks = allTasks.newTasks;
+  const completedTasks = allTasks.completedTasks;
+
+  // query active tasks:
   
-  if (tasks.length === 0) {
+  if (allTasks.length === 0) {
     new Notice('No tasks found');
 
-  } else if (tasks.length === 1) {
-    projects = await getProjects(api);
-    const response = await createTask(api, tasks[0]);
-    if (editor) {
-      updateTaskRowEditor(tasks[0], response.id, editor)
-    }
+  // } else if (tasks.length === 1) {
+  //   projects = await getProjects(api);
+  //   activeTasks = await getActiveTasks(api);
+  //   const response = await createTask(api, tasks[0]);
+  //   if (editor) {
+  //     updateTaskRowEditor(tasks[0], response.id, editor)
+  //   }
   } else {
     projects = await getProjects(api);
-    for (const task of tasks) {
+    // create and add todoist ID to new tasks
+    for (const task of newTasks) {
       const response = await createTask(api, task);
       if (editor) {
         updateTaskRowEditor(task, response.id, editor)
       }
+    }
 
+    // update completed tasks
+    for (const taskRow of completedTasks) {
+      if (editor) {
+        markTaskAsCompleted(taskRow, editor)
+      }
     }
   }
 }
@@ -330,6 +372,7 @@ export default class MyPlugin extends Plugin {
 			name: 'Sync with Todoist',
 			Callback: async () => {
 
+        // TODO: Check if navigator is available in obsidian (it is in browser)
         if (!navigator.onLine) {
           new Notice('No active internet connection.');
           return;
