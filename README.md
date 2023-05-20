@@ -14,7 +14,7 @@ Obsidian to Todoist is a plugin for the [Obsidian](https://obsidian.md/) note-ta
 
 ## Installation
 
-1. Download the latest release of the Obsidian Todoist Integration plugin from the [releases page](https://github.com/your-username/obsidian-todoist-integration/releases).
+1. Download the latest release of the Obsidian Todoist Integration plugin from the [releases page](https://github.com/VFMR/obsidian-todoist/releases).
 2. Copy the plugin folder into `.obsidian/plugins/` in your vault.
 3. Open Obsidian and go to **Settings** -> **Third-Party Plugins**.
 4. Enable **Obsidian Todoist Integration** by toggling the switch.
@@ -51,15 +51,15 @@ Obsidian to Todoist is a plugin for the [Obsidian](https://obsidian.md/) note-ta
 
 To use the Obsidian Todoist Integration plugin, you need to set up your Todoist API token. Follow these steps to configure the plugin:
 
-1. Go to the [Todoist Developer page](https://developer.todoist.com/appconsole.html).
-2. Create a new app and generate an API token.
-3. Open Obsidian and go to **Settings** -> **Obsidian Todoist Integration**.
+1. Log in to Todoist and go to the [Developer page](https://todoist.com/app/settings/integrations/developer)
+2. Copy your API-Token
+3. Open Obsidian and go to **Community plugins** and click on the gear next to **Obsidian to Todoist**
 4. Paste your Todoist API token in the designated field.
 
 
 ## Contributing
 
-Contributions to the Obsidian Todoist Integration plugin are welcome! If you encounter any issues or have suggestions for improvements, please open an issue on the [GitHub repository](https://github.com/your-username/obsidian-todoist-integration) or submit a pull request.
+Contributions to the Obsidian Todoist Integration plugin are welcome! If you encounter any issues or have suggestions for improvements, please open an issue on the [GitHub repository](https://github.com/MVFR/obsidian-todoist) or submit a pull request.
 
 
 ## License
