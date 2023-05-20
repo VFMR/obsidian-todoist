@@ -1,96 +1,68 @@
-# Obsidian Sample Plugin
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+# Obsidian to Todoist
 
-This project uses Typescript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in Typescript Definition format, which contains TSDoc comments describing what it does.
+Obsidian to Todoist is a plugin for the [Obsidian](https://obsidian.md/) note-taking tool that allows users to seamlessly sync and manage their tasks between Obsidian and Todoist.
 
-**Note:** The Obsidian API is still in early alpha and is subject to change at any time!
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Changes the default font color to red using `styles.css`.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open Sample Modal" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- Sync tasks between Obsidian and Todoist
+- Identify and send Markdown tasks to Todoist
+- Update task status in Obsidian from Todoist
+- Automatically sync all files in the vault on startup if they contain a specific pattern (`{{todoist}}` by default)
+- Add bullet points a d Codeblocks below the markdown to the Todoist task description
 
-## First time developing plugins?
 
-Quick starting guide for new plugin devs:
+## Installation
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+1. Download the latest release of the Obsidian Todoist Integration plugin from the [releases page](https://github.com/your-username/obsidian-todoist-integration/releases).
+2. Copy the plugin folder into `.obsidian/plugins/` in your vault.
+3. Open Obsidian and go to **Settings** -> **Third-Party Plugins**.
+4. Enable **Obsidian Todoist Integration** by toggling the switch.
+5. Enjoy the seamless integration of Obsidian and Todoist!
 
-## Releasing new releases
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+## Usage
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+1. Open an Obsidian note that contains Markdown tasks in the following format:
 
-## Adding your plugin to the community plugin list
+   ```markdown
+   - [ ] Task 1
+   - [ ] Task 2
+   - [x] Completed Task
+   ```
 
-- Check https://github.com/obsidianmd/obsidian-releases/blob/master/plugin-review.md
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
+2. Use a command or ribbon menu icon to trigger the Todoist integration.
+3. The plugin will identify Markdown tasks alongside other information (such as descriptions, due dates, and priority)
+```markdown
+- [ ] my task
+    - a line for the description
+    - another line for the description
 
-## How to use
-
-- Clone this repo.
-- `npm i` or `yarn` to install dependencies
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint (optional)
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- To use eslint with this project, make sure to install eslint from terminal:
-  - `npm install -g eslint`
-- To use eslint to analyze this project use this command:
-  - `eslint main.ts`
-  - eslint will then create a report with suggestions for code improvement by file and line number.
-- If your source code is in a folder, such as `src`, you can use eslint with this command to analyze all files in that folder:
-  - `eslint .\src\`
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+- [x] this task will not be sent to Todoist
+- [ ] A task with high priority p1
+- [ ] Another task with high priority ⏫
+- [ ] A task with due date due: tomorrow
 ```
 
-If you have multiple URLs, you can also do:
+5. The tasks will be sent to Todoist, and their status will be synced between Obsidian and Todoist.
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
-```
 
-## API Documentation
+## Configuration
 
-See https://github.com/obsidianmd/obsidian-api
+To use the Obsidian Todoist Integration plugin, you need to set up your Todoist API token. Follow these steps to configure the plugin:
+
+1. Go to the [Todoist Developer page](https://developer.todoist.com/appconsole.html).
+2. Create a new app and generate an API token.
+3. Open Obsidian and go to **Settings** -> **Obsidian Todoist Integration**.
+4. Paste your Todoist API token in the designated field.
+
+
+## Contributing
+
+Contributions to the Obsidian Todoist Integration plugin are welcome! If you encounter any issues or have suggestions for improvements, please open an issue on the [GitHub repository](https://github.com/your-username/obsidian-todoist-integration) or submit a pull request.
+
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
