@@ -161,7 +161,7 @@ function findTasksWithContext(projects: TodoistProject[],
           
           // handling of new tasks
           } else {
-            task_string = task_match[0];
+            task_string = task_match[0] // .replace(/{{todoist-id\d+}}/, '');
             indentLevel = currentIndentLevel;
             taskRow = row;
           }
