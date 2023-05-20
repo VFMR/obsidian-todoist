@@ -29,27 +29,24 @@ Obsidian to Todoist is a plugin for the [Obsidian](https://obsidian.md/) note-ta
 ## Usage
 
 1. Open an Obsidian note that contains Markdown tasks in the following format:
-
    ```markdown
    - [ ] Task 1
    - [ ] Task 2
    - [x] Completed Task
    ```
-
 2. Use a command or ribbon menu icon to trigger the Todoist integration.
 3. The plugin will identify Markdown tasks alongside other information (such as descriptions, due dates, and priority)
-```markdown
-- [ ] my task
-    - a line for the description
-    - another line for the description
+  ```markdown
+  - [ ] my task
+      - a line for the description
+      - another line for the description
 
-- [x] this task will not be sent to Todoist
-- [ ] A task with high priority p1
-- [ ] Another task with high priority ⏫
-- [ ] A task with due date due: tomorrow
-```
-
-5. The tasks will be sent to Todoist, and their status will be synced between Obsidian and Todoist.
+  - [x] this task will not be sent to Todoist
+  - [ ] A task with high priority p1
+  - [ ] Another task with high priority ⏫
+  - [ ] A task with due date due: tomorrow
+  ```
+4. The tasks will be sent to Todoist, and their status will be synced between Obsidian and Todoist.
 
 
 ## Configuration
