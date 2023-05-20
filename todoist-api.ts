@@ -47,3 +47,12 @@ export async function createTask(api: TodoistApi, task: TodoistTask) {
 }
 
 
+export async function getActiveTasks(api: TodoistApi): string[] {
+  const tasks = await api.getTasks();
+
+  const task_list: string[] = [];
+  for (let i = 0; i < tasks.length; i++) {
+    task_list.push(tasks[i].id);
+  }
+  return task_list;
+}
