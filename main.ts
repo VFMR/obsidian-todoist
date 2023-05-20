@@ -42,7 +42,7 @@ const DEFAULT_PATTERNS = {
   dueRemovePattern: /((due: )|(📅 ))/g,
   syncPattern: /{{todoist}}/g,
   todoistIdPattern: /{{todoist-id[0-9]+}}/g,
-}
+};
 
 
 const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
@@ -51,7 +51,7 @@ const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
   syncPattern: '/{{todoist}}/g',
   taskPattern: '/- \[ \] .*(\n|$)/g', 
   dueLanguage: 'en'
-}
+};
 
 
 // // find all the tasks in the current file
@@ -147,15 +147,16 @@ function findTasksWithContext(projects: TodoistProject[],
         task_match = line.match(DEFAULT_PATTERNS.taskPattern);
         if (task_match) {
           // check if task has a todoist id  
-          const id_match = line.match(/{{todoist_id(\d+)}}/);
+          const id_match = line.match(/{{todoist-id(\d+)}}/);
           if (id_match) {
             task_id = id_match[1];
-            new Notice(task_id);
+            console.log('identified task-id: ' + task_id);
+
             // check if this is an active task
             if (activeTasks.includes(task_id)) {
               continue;
             } else {
-              completedTasks.push(row)
+              completedTasks.push(row);
             }
           
           // handling of new tasks
@@ -163,6 +164,7 @@ function findTasksWithContext(projects: TodoistProject[],
             task_string = task_match[0];
             indentLevel = currentIndentLevel;
             taskRow = row;
+          }
         }
 
       // Check for subordinate bullet points
@@ -193,10 +195,10 @@ function findTasksWithContext(projects: TodoistProject[],
     tasks.push(tdTask);
   }
 
-  allTasks = {
+  const allTasks = {
     completedTasks: completedTasks,
     newTasks: tasks
-  }
+  };
 
   return allTasks;
 }
@@ -216,7 +218,7 @@ function updateTaskRowEditor(tdTask: TodoistTask, taskId: string, editor: Editor
 
 function markTaskAsCompleted(row, editor: Editor) {
   const currentTaskLine = editor.getLine(row);
-  const updatedTaskLine = currentTaskLine.replace('[ ]', '[x]')
+  const updatedTaskLine = currentTaskLine.replace('[ ]', '[x]');
   editor.replaceRange(updatedTaskLine, { line: row, ch: 0 }, { line: row, ch: currentTaskLine.length });
 }
 
@@ -275,7 +277,7 @@ function makeTask(projects: TodoistProject[],
     "description": descripton,
     "textRow": textRow
     };
-  new Notice(task)
+  console.log(task)
   return task;
 }
 
@@ -286,7 +288,9 @@ async function findAndSendTasks(api: TodistApi,
                                 editor?: Editor) {
   // TODO: currently only works with for the active file, not the vault
   let projects: TodoistProject[];
-  const allTasks = findTasksWithContext(projects, dueLanguage, text);
+  const activeTasks = await getActiveTasks(api);
+  console.log(activeTasks);
+  const allTasks = findTasksWithContext(projects, activeTasks, dueLanguage, text);
   const newTasks = allTasks.newTasks;
   const completedTasks = allTasks.completedTasks;
 
@@ -304,18 +308,19 @@ async function findAndSendTasks(api: TodistApi,
   //   }
   } else {
     projects = await getProjects(api);
+
     // create and add todoist ID to new tasks
     for (const task of newTasks) {
       const response = await createTask(api, task);
       if (editor) {
-        updateTaskRowEditor(task, response.id, editor)
+        updateTaskRowEditor(task, response.id, editor);
       }
     }
 
     // update completed tasks
     for (const taskRow of completedTasks) {
       if (editor) {
-        markTaskAsCompleted(taskRow, editor)
+        markTaskAsCompleted(taskRow, editor);
       }
     }
   }
