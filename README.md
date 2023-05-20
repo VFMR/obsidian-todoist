@@ -14,6 +14,11 @@ Obsidian to Todoist is a plugin for the [Obsidian](https://obsidian.md/) note-ta
 
 ## Installation
 
+> **Warning**
+> This plugin makes changes to files in your vault and is in an early stage of development.
+> Use at your own risk and make backups to prevent data loss.
+
+
 1. Download the latest release of the Obsidian Todoist Integration plugin from the [releases page](https://github.com/VFMR/obsidian-todoist/releases).
 2. Copy the plugin folder into `.obsidian/plugins/` in your vault.
 3. Open Obsidian and go to **Settings** -> **Third-Party Plugins**.
