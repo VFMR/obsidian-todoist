@@ -17,18 +17,33 @@ export class MySettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h3', {text: 'API Settings'});
 
+    let inputEl
 
-    // setting for api token
-		new Setting(containerEl)
-			.setName('apiToken')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue('*'.repeat(this.plugin.settings.apiToken.length))
-				.onChange(async (value) => {
-					this.plugin.settings.apiToken = value;
-					await this.plugin.saveSettings();
-				}));
+    const keySetting = new Setting(containerEl)
+        .setName('apiToken')
+        .setDesc('Enter your API token')
+        .addText(text => text
+            .setPlaceholder('Enter your API token here')
+            .setValue(this.plugin.settings.apiToken)
+            .onChange(async (value) => {
+                this.plugin.settings.apiToken = value;
+                await this.plugin.saveSettings();
+            })
+            .then((textEl)=> {
+                inputEl = textEl
+            })
+            .inputEl.setAttribute('type', 'password')
+        )
+
+    // setting element with a button to reveal the api token
+    keySetting.addToggle(x => x
+        .onChange((value) => {
+            if(value) {
+                inputEl.inputEl.setAttribute('type', 'clear')
+            } else {
+                inputEl.inputEl.setAttribute('type', 'password')
+            }
+    }));
 
 
 		containerEl.createEl('h3', {text: 'Task settings'});
