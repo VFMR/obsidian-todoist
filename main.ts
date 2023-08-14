@@ -89,9 +89,19 @@ function findTasksWithContext(projects: TodoistProject[],
   let isInCodeBlock: boolean = false;
   let taskRow: number | null = null;
   let row: number = -1;
+  let currentIndentLevel: number = 0;
 
   for (const line of lines) {
     row += 1;
+
+    // get current indent level:
+    const match = line.match(/^(\s*-+)\s*(.*)/);
+    if (match) {
+      currentIndentLevel = match[1].length;
+    } else  {
+      currentIndentLevel = 0;
+    }
+    
 
     // empty line -> push task to tasks
     if (line.trim() === '') {
@@ -112,6 +122,7 @@ function findTasksWithContext(projects: TodoistProject[],
     // Starting and ending code blocks
     const codeBlockStart = line.match(/^```(?:([a-zA-Z0-9]+))?$/);
     if (codeBlockStart) {
+      const codeBlockIndentLevel = currentIndentLevel;
       // ending code block?
       if (isInCodeBlock) {
         isInCodeBlock = false; // Exiting an existing code block
@@ -130,17 +141,15 @@ function findTasksWithContext(projects: TodoistProject[],
     // add line if inside a code block
     if (isInCodeBlock) {
       if (task_string !== '') {
-        // TODO: line.trim() sets everything to the same indent level. 
-        // Ideally, one should only remove the indent level of the task line
-        taskDescription += line.trim() + '\n';
+        // remove the indent level of the task line
+        const lineWithoutIndent = line.substring(codeBlockIndentLevel);
+        taskDescription += lineWithoutIndent + '\n';
       }
       continue;
     }
 
     // check if line is a task or a description
-    const match = line.match(/^(\s*-+)\s*(.*)/);
     if (match) {
-      const currentIndentLevel = match[1].length;
 
       // Check for new tasks
       if (task_string === '') {
