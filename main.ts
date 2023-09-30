@@ -25,6 +25,8 @@ interface TodoistTask {
   priority: number;
   due_string: string;
   due_lang: string;
+  isChild: boolean;
+  parentId: string;
 };
 
 
@@ -40,6 +42,7 @@ const DEFAULT_PATTERNS = {
   taskRemovePattern: /- \[ \] /g,
   duePattern: /((due: )|(📅 ))([a-zA-Z0-9\-\.]+)/g,
   dueRemovePattern: /((due: )|(📅 ))/g,
+  prioPattern: /( p[0-4](\n| |$))/g,
   syncPattern: /{{todoist}}/g,
   todoistIdPattern: /{{todoist-id[0-9]+}}/g,
 };
@@ -90,18 +93,16 @@ function findTasksWithContext(projects: TodoistProject[],
   let taskRow: number | null = null;
   let row: number = -1;
   let currentIndentLevel: number = 0;
+  let taskCounter: number = 0;
+  let isChild: boolean = false;
+  let childLevel: number = 0;
+  let parentId: number | null = null;
+  let parentEnd: boolean = true;
+  let parentIndent: number = 0;
+  let inTask: boolean = false;
 
   for (const line of lines) {
     row += 1;
-
-    // get current indent level:
-    const match = line.match(/^(\s*-+)\s*(.*)/);
-    if (match) {
-      currentIndentLevel = match[1].length;
-    } else  {
-      currentIndentLevel = 0;
-    }
-    
 
     // empty line -> push task to tasks
     if (line.trim() === '') {
@@ -114,9 +115,22 @@ function findTasksWithContext(projects: TodoistProject[],
           indentLevel = 0;
           taskDescription = '';
           taskRow = null;
+          isChild = false;
+          childLevel = 0;
+          parentEnd = true;
+          parentIndent = 0;
+          inTask = false;
         }
         continue;
       }
+    }
+
+    // get current indent level:
+    const match = line.match(/^(\s*-+)\s*(.*)/);
+    if (match) {
+      currentIndentLevel = match[1].length;
+    } else  {
+      currentIndentLevel = 0;
     }
 
     // Starting and ending code blocks
@@ -150,16 +164,20 @@ function findTasksWithContext(projects: TodoistProject[],
 
     // check if line is a task or a description
     if (match) {
+      task_match = line.match(DEFAULT_PATTERNS.taskPattern);
+      const id_match = line.match(/{{todoist-id(\d+)}}/);
 
-      // Check for new tasks
-      if (task_string === '') {
-        task_match = line.match(DEFAULT_PATTERNS.taskPattern);
-        if (task_match) {
-          // check if task has a todoist id  
-          const id_match = line.match(/{{todoist-id(\d+)}}/);
+      if (task_match) {
+
+        // check for subordinate bullet points -> subtasks
+        if (currentIndentLevel > indentLevel) {
+
+        } 
+
+        // parent tasks:
+        if (currentIndentLevel == indentLevel) {
           if (id_match) {
             task_id = id_match[1];
-            console.log('identified task-id: ' + task_id);
 
             // check if this is an active task
             if (activeTasks.includes(task_id)) {
@@ -176,9 +194,16 @@ function findTasksWithContext(projects: TodoistProject[],
           }
         }
 
-      // Check for subordinate bullet points
-      } else if (currentIndentLevel > indentLevel) {
-        taskDescription += line + '\n';
+      // no task match:
+      } else {
+        // check for subordinate bullet points -> description
+        if (currentIndentLevel > indentLevel) {
+          const lineWithoutIndent = line.substring(indentLevel);
+          taskDescription += lineWithoutIndent + '\n';
+        }
+
+      }
+    }
 
       // Otherwise, create the task
       } else {
@@ -271,22 +296,29 @@ function makeTask(projects: TodoistProject[],
                   task_string: string,
                   dueLanguage: string,
                   descripton: string,
-                  textRow: number): TodoistTask {
+                  textRow: number,
+                  isChild: boolean,
+                  parentId: string): TodoistTask {
     // TODO: add support for labels
     // TODO: add support for assignee
     // TODO: add support for due dates with spaces
     // TODO: fix project_id recognition 
     const task: TodoistTask = {
-    "content": task_string.replace(DEFAULT_PATTERNS.taskRemovePattern, '').replace('\n', ''),
+    "content": task_string.replace(DEFAULT_PATTERNS.taskRemovePattern, '')\
+                          .replace(DEFAULT_PATTERNS.duePattern, '')\
+                          .replace(DEFAULT_PATTERNS.prioPattern, '')\
+                          .replace('\n', ''),
     // "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
     "project_name": task_string.match(/#.*(\s|$)/),
     "priority": findPriority(task_string),
     "due_string": findDueDate(task_string),
     "due_lang": dueLanguage,
     "description": descripton,
-    "textRow": textRow
+    "textRow": textRow,
+    "isChild": isChild,
+    "parentId": parentId
     };
-  console.log(task)
+  // console.log(task)
   return task;
 }
 
