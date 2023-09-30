@@ -42,7 +42,7 @@ const DEFAULT_PATTERNS = {
   taskRemovePattern: /- \[ \] /g,
   duePattern: /((due: )|(📅 ))([a-zA-Z0-9\-\.]+)/g,
   dueRemovePattern: /((due: )|(📅 ))/g,
-  prioPattern: /( p[0-4](\n| |$))/g,
+  prioPattern: /( (p\d|⏫|🔼|🔽|⏬)(\n| |$))/)/g,
   syncPattern: /{{todoist}}/g,
   todoistIdPattern: /{{todoist-id[0-9]+}}/g,
 };
@@ -258,8 +258,7 @@ function markTaskAsCompleted(row, editor: Editor) {
 
 
 function findPriority(task: string): number {
-  // match either /p\d/ or "⏫", "🔼", "🔽 ", or "⏬"
-  const priority = task.match(/(p\d|⏫|🔼|🔽|⏬)/);
+  const priority = task.match(DEFAULT_PATTERNS.prioPattern).strip();
 
   var prio_num = 4;
   // return integer
