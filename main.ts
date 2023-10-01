@@ -36,7 +36,7 @@ const DEFAULT_PATTERNS = {
   taskRemovePattern: /- \[ \] /g,
   duePattern: /((due: )|(📅 ))([a-zA-Z0-9\-\.]+)/g,
   dueRemovePattern: /((due: )|(📅 ))/g,
-  prioPattern: /( (p\d|⏫|🔼|🔽|⏬)(\n| |$))/)/g,
+  prioPattern: /( (p\d|⏫|🔼|🔽|⏬)( |$))/g,
   syncPattern: /{{todoist}}/g,
   todoistIdPattern: /{{todoist-id[0-9]+}}/g,
 };
@@ -73,6 +73,7 @@ function findTasksWithContext(projects: TodoistProject[],
   let indentLevel: number = 0;
   let taskDescription: string = '';
   let isInCodeBlock: boolean = false;
+  let codeBlockIndentLevel: number = 0;
   let taskRow: number | null = null;
   let row: number = -1;
   let currentIndentLevel: number = 0;
@@ -81,6 +82,7 @@ function findTasksWithContext(projects: TodoistProject[],
   // let childLevel: number = 0;
   let parentId: number | null = null;
   let taskId: number | null = null;
+  let parentIndentLevel: number | null = 0;
   // let parentEnd: boolean = true;
   // let parentIndent: number = 0;
   let inTask: boolean = false;
@@ -112,6 +114,7 @@ function findTasksWithContext(projects: TodoistProject[],
           // parentEnd = true;
           // parentIndent = 0;
           parentId = null;
+          parentIndentLevel = null;
         }
         continue;
       }
@@ -161,6 +164,24 @@ function findTasksWithContext(projects: TodoistProject[],
       idMatch = line.match(/\{\{todoist-id(\d+)\}\}/);
 
       if (task_match) {
+        // send any previous tasks to the array:
+        if (task_string) {
+          tdTask = makeTask(projects,
+                            taskId,
+                            parentId,
+                            task_string,
+                            dueLanguage,
+                            taskDescription, 
+                            taskRow);
+
+          tasks.push(tdTask);
+          task_string = '';
+          indentLevel = 0;
+          taskDescription = '';
+          taskRow = null;
+          parentId = null;
+        }
+
         taskCounter += 1;
         taskId = taskCounter;
 
@@ -178,70 +199,69 @@ function findTasksWithContext(projects: TodoistProject[],
         // handling of new tasks
         } else {
           // check if this is a subtask
-          // TODO: Because there is only one parent ID and we can have both
-          // parallel and nested subtasks, I need a way to keep track of
-          // the parent IDs of all subtasks. This is a temporary solution
-          // and only allows for one level of subtasks.
-          if (parentId) {
-            if (currentIndentLevel > indentLevel) {
-              // this is a subtask of the previous task
-              task_string = task_match[0];
-              indentLevel = currentIndentLevel;
-              taskRow = row;
-            } else if (currentIndentLevel == indentLevel) {
-              // this must be a second or later subtask
-              task_string = task_match[0];
-              indentLevel = currentIndentLevel;
-              taskRow = row;
-            }
-          } else {
-            task_string = task_match[0] // .replace(/{{todoist-id\d+}}/, '');
-            indentLevel = currentIndentLevel;
-            taskRow = row;
-            parentId = taskId;
+          if (currentIndentLevel > indentLevel) {
+            parentId = taskId - 1;
+            parentIndentLevel = indentLevel;
+          } 
+          // TODO: currently not possible to go back up after a subtask
+          // of a subtask
+          if (currentIndentLevel < indentLevel) {
+            parentId = null;
+            parentIndentLevel = 0;
           }
-        }
 
-      // no task match:
-      } else {
-        // check for subordinate bullet points -> description
-        if (currentIndentLevel > indentLevel) {
-          const lineWithoutIndent = line.substring(indentLevel);
-          taskDescription += lineWithoutIndent + '\n';
-        }
+          // new parent
+          if (!currentIndentLevel >= parentIndentLevel) {
+            parentId = taskId;
+            parentIndentLevel = currentIndentLevel;
+          }
 
-      }
-    }
 
-      // Otherwise, create the task
-      } else {
-        tdTask = makeTask(projects,
-                          taskId,
-                          parentId,
-                          task_string,
-                          dueLanguage,
-                          taskDescription, 
-                          taskRow);
-
-        tasks.push(tdTask);
-        task_string = '';
-        indentLevel = 0;
-        taskDescription = '';
-        taskRow = null;
-        // childLevel = 0;
-        // parentEnd = true;
-        // parentIndent = 0;
-        parentId = null;
-
-        // Check if the line contains a new task instead
-        task_match = line.match(DEFAULT_PATTERNS.taskPattern);
-        if (task_match) {
           task_string = task_match[0];
           indentLevel = currentIndentLevel;
           taskRow = row;
         }
-        indentLevel = currentIndentLevel;
-        taskDescription = '';
+
+      // no task match:
+      } else {
+        if (task_string !== '') {  // only act if we have a task to add
+          // check for subordinate bullet points -> description
+          if (currentIndentLevel > indentLevel) {
+            const lineWithoutIndent = line.substring(indentLevel);
+            taskDescription += lineWithoutIndent + '\n';
+
+          // Otherwise, create the task
+          } else {
+            tdTask = makeTask(projects,
+                              taskId,
+                              parentId,
+                              task_string,
+                              dueLanguage,
+                              taskDescription, 
+                              taskRow);
+
+            tasks.push(tdTask);
+            task_string = '';
+            indentLevel = 0;
+            taskDescription = '';
+            taskRow = null;
+            // childLevel = 0;
+            // parentEnd = true;
+            // parentIndent = 0;
+            parentId = null;
+            parentIndentLevel = 0;
+
+            // Check if the line contains a new task instead
+            task_match = line.match(DEFAULT_PATTERNS.taskPattern);
+            if (task_match) {
+              task_string = task_match[0];
+              indentLevel = currentIndentLevel;
+              taskRow = row;
+            }
+            indentLevel = currentIndentLevel;
+            taskDescription = '';
+          }
+        }
       }
     }
   }
@@ -265,6 +285,7 @@ function findTasksWithContext(projects: TodoistProject[],
     // parentEnd = true;
     // parentIndent = 0;
     parentId = null;
+    parentIndentLevel = 0;
   }
 
   const allTasks = {
@@ -296,7 +317,7 @@ function markTaskAsCompleted(row, editor: Editor) {
 
 
 function findPriority(task: string): number {
-  const priority = task.match(DEFAULT_PATTERNS.prioPattern).strip();
+  const priority = task.match(DEFAULT_PATTERNS.prioPattern)
 
   var prio_num = 4;
   // return integer
@@ -310,7 +331,8 @@ function findPriority(task: string): number {
     } else if (priority[0] === '⏬') {
       prio_num = 4;
     } else {
-      prio_num = parseInt(priority[0].slice(1));
+      const cleanPrio = priority[0].replace(' ', '');
+      prio_num = parseInt(cleanPrio.slice(1));
     } 
   }
   // reverse numbers to be consistent with app, where 1 is highest priority:
@@ -329,6 +351,15 @@ function findDueDate(task: string): string {
 }
 
 
+function cleanTaskContent(rawContent: string): string {
+  var cleanContent = rawContent.replace(DEFAULT_PATTERNS.taskRemovePattern, '');
+  cleanContent = cleanContent.replace(DEFAULT_PATTERNS.duePattern, '');
+  cleanContent = cleanContent.replace(DEFAULT_PATTERNS.prioPattern, '');
+  cleanContent = cleanContent.replace('\n', '');
+  return cleanContent;
+}
+
+
 function makeTask(projects: TodoistProject[], 
                   taskId: string,
                   parentId: string,
@@ -340,11 +371,9 @@ function makeTask(projects: TodoistProject[],
     // TODO: add support for assignee
     // TODO: add support for due dates with spaces
     // TODO: fix project_id recognition 
-    const task: TodoistTask = {
-    "content": task_string.replace(DEFAULT_PATTERNS.taskRemovePattern, '')\
-                          .replace(DEFAULT_PATTERNS.duePattern, '')\
-                          .replace(DEFAULT_PATTERNS.prioPattern, '')\
-                          .replace('\n', ''),
+
+      const task: TodoistTask = {
+    "content": cleanTaskContent(task_string),
     // "project_id": getProjectId(projects, task_string.match(/#.*(\s|$)/)),
     "project_name": task_string.match(/#.*(\s|$)/),
     "priority": findPriority(task_string),
@@ -352,10 +381,11 @@ function makeTask(projects: TodoistProject[],
     "due_lang": dueLanguage,
     "description": descripton,
     "textRow": textRow,
-    "parentId": parentId
-    "parentTodoistId": null
+    "parentId": parentId,
+    "parentTodoistId": null,
     "taskId": taskId
     };
+  console.log(task);
   // console.log(task)
   return task;
 }
@@ -372,6 +402,8 @@ async function findAndSendTasks(api: TodistApi,
   const allTasks = findTasksWithContext(projects, activeTasks, dueLanguage, text);
   const newTasks = allTasks.newTasks;
   const completedTasks = allTasks.completedTasks;
+  let response = null;
+  let task = null;
 
   // query active tasks:
   
@@ -390,28 +422,28 @@ async function findAndSendTasks(api: TodistApi,
 
     // re-sort the tasks in newTask such that tasks with parentId = null are first
     // because the API requires that parent tasks are created first
-    newTasks.sort((a, b) => {
-      if (a.parentId === null && b.parentId !== null) {
-        return -1;
-      } else if (a.parentId !== null && b.parentId === null) {
-        return 1;
-      } else {
-        return 0;
-      }
-    });
+    // newTasks.sort((a, b) => {
+    //   if (a.parentId === null && b.parentId !== null) {
+    //     return -1;
+    //   } else if (a.parentId !== null && b.parentId === null) {
+    //     return 1;
+    //   } else {
+    //     return 0;
+    //   }
+    // });
 
 
     const newTaskIds = {};  // maps internal taskId to todoist ID
 
-    for (const task of newTasks) {
+    for (task of newTasks) {
       if (!task.parentId) {  // is parent
-        const response = await createTask(api, task);
+        response = await createTask(api, task);
         newTaskIds[task.id] = response.id;
 
       } else {  // is child
         // setting the parentTodoistId to the todoist ID of the parent task
         task.parentTodoistId = newTaskIds[task.parentId];
-        const response = await createTask(api, task);
+        response = await createTask(api, task);
         newTaskIds[task.id] = response.id;
       }
 
