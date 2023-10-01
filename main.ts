@@ -107,12 +107,8 @@ function findTasksWithContext(projects: TodoistProject[],
 
           tasks.push(tdTask);
           task_string = '';
-          // indentLevel = 0;
           taskDescription = '';
           taskRow = null;
-          // childLevel = 0;
-          // parentEnd = true;
-          // parentIndent = 0;
           parentId = null;
           parentIndentLevel = 0;
         }
@@ -176,10 +172,8 @@ function findTasksWithContext(projects: TodoistProject[],
 
           tasks.push(tdTask);
           task_string = '';
-          // indentLevel = 0;
           taskDescription = '';
           taskRow = null;
-          // parentId = null;
         }
 
         taskCounter += 1;
@@ -242,9 +236,6 @@ function findTasksWithContext(projects: TodoistProject[],
             indentLevel = 0;
             taskDescription = '';
             taskRow = null;
-            // childLevel = 0;
-            // parentEnd = true;
-            // parentIndent = 0;
             parentId = null;
             parentIndentLevel = 0;
 
@@ -278,9 +269,6 @@ function findTasksWithContext(projects: TodoistProject[],
     indentLevel = 0;
     taskDescription = '';
     taskRow = null;
-    // childLevel = 0;
-    // parentEnd = true;
-    // parentIndent = 0;
     parentId = null;
     parentIndentLevel = 0;
   }
