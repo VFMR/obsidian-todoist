@@ -107,14 +107,14 @@ function findTasksWithContext(projects: TodoistProject[],
 
           tasks.push(tdTask);
           task_string = '';
-          indentLevel = 0;
+          // indentLevel = 0;
           taskDescription = '';
           taskRow = null;
           // childLevel = 0;
           // parentEnd = true;
           // parentIndent = 0;
           parentId = null;
-          parentIndentLevel = null;
+          parentIndentLevel = 0;
         }
         continue;
       }
@@ -176,17 +176,17 @@ function findTasksWithContext(projects: TodoistProject[],
 
           tasks.push(tdTask);
           task_string = '';
-          indentLevel = 0;
+          // indentLevel = 0;
           taskDescription = '';
           taskRow = null;
-          parentId = null;
+          // parentId = null;
         }
 
         taskCounter += 1;
         taskId = taskCounter;
 
         // Task already sent?
-        if (idMatch) {  // BUG: this appears to fail
+        if (idMatch) {  
           todoistId = idMatch[1];
 
           // check if this is an active task
@@ -202,16 +202,13 @@ function findTasksWithContext(projects: TodoistProject[],
           if (currentIndentLevel > indentLevel) {
             parentId = taskId - 1;
             parentIndentLevel = indentLevel;
-          } 
-          // TODO: currently not possible to go back up after a subtask
-          // of a subtask
-          if (currentIndentLevel < indentLevel) {
-            parentId = null;
-            parentIndentLevel = 0;
+          } else if (currentIndentLevel < indentLevel) {
+            parentId = taskId;
+            parentIndentLevel = currentIndentLevel;
           }
 
-          // new parent
-          if (!currentIndentLevel >= parentIndentLevel) {
+          // new parent?
+          if (currentIndentLevel <= parentIndentLevel) {
             parentId = taskId;
             parentIndentLevel = currentIndentLevel;
           }
@@ -436,15 +433,15 @@ async function findAndSendTasks(api: TodistApi,
     const newTaskIds = {};  // maps internal taskId to todoist ID
 
     for (task of newTasks) {
-      if (!task.parentId) {  // is parent
+      if (task.parentId === task.taskId) {  // is parent
         response = await createTask(api, task);
-        newTaskIds[task.id] = response.id;
+        newTaskIds[task.taskId] = response.id;
 
       } else {  // is child
         // setting the parentTodoistId to the todoist ID of the parent task
         task.parentTodoistId = newTaskIds[task.parentId];
         response = await createTask(api, task);
-        newTaskIds[task.id] = response.id;
+        newTaskIds[task.taskId] = response.id;
       }
 
       // update the information on the editor
