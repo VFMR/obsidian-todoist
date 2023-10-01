@@ -25,18 +25,12 @@ interface TodoistTask {
   priority: number;
   due_string: string;
   due_lang: string;
-  isChild: boolean;
   parentId: string;
+  parentTodoistId: string;
+  taskId: string;
 };
 
 
-// TODO: add as parameters to the plugin settings instead of hardcoding.
-// requires me to specify the patterns in strings, with double backslashes 
-// (i.e. '- \\[ \\] ') for the regex to work. and then use 
-// ` new RegExp(string_pattern, 'g') `
-// to create a regex 
-// I can create such an escaped pattern from a regular regex entry with this:
-// userPattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const DEFAULT_PATTERNS = {
   taskPattern: /- \[ \] .*(\n|$)/g,
   taskRemovePattern: /- \[ \] /g,
@@ -56,17 +50,6 @@ const DEFAULT_SETTINGS: Partial<MyPluginSettings> = {
   dueLanguage: 'en'
 };
 
-
-// // find all the tasks in the current file
-// function findTasks(editor: Editor): string[] {
-//   const tasks = editor.getValue().match(/- \[.\] .*(\n|$)/g);
-//   if (tasks) {
-//     return tasks;
-//   } else {
-//     return [];
-//   }
-//   new Notice(tasks);
-// }
 
 function findTasks(text: string): string[] {
   const tasks = text.match(DEFAULT_PATTERNS.taskPattern);
@@ -94,36 +77,46 @@ function findTasksWithContext(projects: TodoistProject[],
   let row: number = -1;
   let currentIndentLevel: number = 0;
   let taskCounter: number = 0;
-  let isChild: boolean = false;
-  let childLevel: number = 0;
+  // let isChild: boolean = false;
+  // let childLevel: number = 0;
   let parentId: number | null = null;
-  let parentEnd: boolean = true;
-  let parentIndent: number = 0;
+  let taskId: number | null = null;
+  // let parentEnd: boolean = true;
+  // let parentIndent: number = 0;
   let inTask: boolean = false;
+  let idMatch: RegExpMatchArray | null = null;
+  let todoistId: string | null = null;
 
   for (const line of lines) {
     row += 1;
 
+    // check for reset:
     // empty line -> push task to tasks
     if (line.trim() === '') {
       if (!isInCodeBlock) {  // allow for empty lines in code blocks
         if (task_string !== '') {
-          tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
+          tdTask = makeTask(projects,
+                            taskId,
+                            parentId,
+                            task_string,
+                            dueLanguage,
+                            taskDescription, 
+                            taskRow);
 
           tasks.push(tdTask);
           task_string = '';
           indentLevel = 0;
           taskDescription = '';
           taskRow = null;
-          isChild = false;
-          childLevel = 0;
-          parentEnd = true;
-          parentIndent = 0;
-          inTask = false;
+          // childLevel = 0;
+          // parentEnd = true;
+          // parentIndent = 0;
+          parentId = null;
         }
         continue;
       }
     }
+
 
     // get current indent level:
     const match = line.match(/^(\s*-+)\s*(.*)/);
@@ -165,32 +158,47 @@ function findTasksWithContext(projects: TodoistProject[],
     // check if line is a task or a description
     if (match) {
       task_match = line.match(DEFAULT_PATTERNS.taskPattern);
-      const id_match = line.match(/{{todoist-id(\d+)}}/);
+      idMatch = line.match(/\{\{todoist-id(\d+)\}\}/);
 
       if (task_match) {
+        taskCounter += 1;
+        taskId = taskCounter;
 
-        // check for subordinate bullet points -> subtasks
-        if (currentIndentLevel > indentLevel) {
+        // Task already sent?
+        if (idMatch) {  // BUG: this appears to fail
+          todoistId = idMatch[1];
 
-        } 
-
-        // parent tasks:
-        if (currentIndentLevel == indentLevel) {
-          if (id_match) {
-            task_id = id_match[1];
-
-            // check if this is an active task
-            if (activeTasks.includes(task_id)) {
-              continue;
-            } else {
-              completedTasks.push(row);
+          // check if this is an active task
+          if (activeTasks.includes(todoistId)) {
+            continue;
+          } else {
+            completedTasks.push(row);
+          }
+        
+        // handling of new tasks
+        } else {
+          // check if this is a subtask
+          // TODO: Because there is only one parent ID and we can have both
+          // parallel and nested subtasks, I need a way to keep track of
+          // the parent IDs of all subtasks. This is a temporary solution
+          // and only allows for one level of subtasks.
+          if (parentId) {
+            if (currentIndentLevel > indentLevel) {
+              // this is a subtask of the previous task
+              task_string = task_match[0];
+              indentLevel = currentIndentLevel;
+              taskRow = row;
+            } else if (currentIndentLevel == indentLevel) {
+              // this must be a second or later subtask
+              task_string = task_match[0];
+              indentLevel = currentIndentLevel;
+              taskRow = row;
             }
-          
-          // handling of new tasks
           } else {
             task_string = task_match[0] // .replace(/{{todoist-id\d+}}/, '');
             indentLevel = currentIndentLevel;
             taskRow = row;
+            parentId = taskId;
           }
         }
 
@@ -207,8 +215,23 @@ function findTasksWithContext(projects: TodoistProject[],
 
       // Otherwise, create the task
       } else {
-        tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
+        tdTask = makeTask(projects,
+                          taskId,
+                          parentId,
+                          task_string,
+                          dueLanguage,
+                          taskDescription, 
+                          taskRow);
+
         tasks.push(tdTask);
+        task_string = '';
+        indentLevel = 0;
+        taskDescription = '';
+        taskRow = null;
+        // childLevel = 0;
+        // parentEnd = true;
+        // parentIndent = 0;
+        parentId = null;
 
         // Check if the line contains a new task instead
         task_match = line.match(DEFAULT_PATTERNS.taskPattern);
@@ -225,8 +248,23 @@ function findTasksWithContext(projects: TodoistProject[],
 
   // push last task
   if (task_string !== '') {
-    tdTask = makeTask(projects, task_string, dueLanguage, taskDescription, taskRow);
+    tdTask = makeTask(projects,
+                      taskId,
+                      parentId,
+                      task_string,
+                      dueLanguage,
+                      taskDescription, 
+                      taskRow);
+
     tasks.push(tdTask);
+    task_string = '';
+    indentLevel = 0;
+    taskDescription = '';
+    taskRow = null;
+    // childLevel = 0;
+    // parentEnd = true;
+    // parentIndent = 0;
+    parentId = null;
   }
 
   const allTasks = {
@@ -292,12 +330,12 @@ function findDueDate(task: string): string {
 
 
 function makeTask(projects: TodoistProject[], 
+                  taskId: string,
+                  parentId: string,
                   task_string: string,
                   dueLanguage: string,
                   descripton: string,
-                  textRow: number,
-                  isChild: boolean,
-                  parentId: string): TodoistTask {
+                  textRow: number): TodoistTask {
     // TODO: add support for labels
     // TODO: add support for assignee
     // TODO: add support for due dates with spaces
@@ -314,8 +352,9 @@ function makeTask(projects: TodoistProject[],
     "due_lang": dueLanguage,
     "description": descripton,
     "textRow": textRow,
-    "isChild": isChild,
     "parentId": parentId
+    "parentTodoistId": null
+    "taskId": taskId
     };
   // console.log(task)
   return task;
@@ -349,9 +388,34 @@ async function findAndSendTasks(api: TodistApi,
   } else {
     projects = await getProjects(api);
 
-    // create and add todoist ID to new tasks
+    // re-sort the tasks in newTask such that tasks with parentId = null are first
+    // because the API requires that parent tasks are created first
+    newTasks.sort((a, b) => {
+      if (a.parentId === null && b.parentId !== null) {
+        return -1;
+      } else if (a.parentId !== null && b.parentId === null) {
+        return 1;
+      } else {
+        return 0;
+      }
+    });
+
+
+    const newTaskIds = {};  // maps internal taskId to todoist ID
+
     for (const task of newTasks) {
-      const response = await createTask(api, task);
+      if (!task.parentId) {  // is parent
+        const response = await createTask(api, task);
+        newTaskIds[task.id] = response.id;
+
+      } else {  // is child
+        // setting the parentTodoistId to the todoist ID of the parent task
+        task.parentTodoistId = newTaskIds[task.parentId];
+        const response = await createTask(api, task);
+        newTaskIds[task.id] = response.id;
+      }
+
+      // update the information on the editor
       if (editor) {
         updateTaskRowEditor(task, response.id, editor);
       }

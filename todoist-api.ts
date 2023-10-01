@@ -14,6 +14,8 @@ interface TodoistTask {
   priority: number;
   due_string: string;
   due_lang: string;
+  taskId: string;
+  parentId: string;
 };
 
 
@@ -42,6 +44,7 @@ export async function createTask(api: TodoistApi, task: TodoistTask) {
     due_string: task.due_string,
     due_lang: task.due_lang,
     description: task.description,
+    parent_id: task.parentTodoistId,
   });
   return response;
 }
