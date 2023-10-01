@@ -37,15 +37,20 @@ export async function getProjects(api: TodoistApi): TodoistProject[] {
 // function to create a task. return whether it was successful or not
 export async function createTask(api: TodoistApi, task: TodoistTask) {
   // BUG: project_id is not working - "{}" ist sent to the API
-  const response = await api.addTask({
-    content: task.content, 
-    priority: task.priority,
-    // project_id: task.project_id,
-    due_string: task.due_string,
-    due_lang: task.due_lang,
-    description: task.description,
-    parent_id: task.parentTodoistId,
-  });
+  let response = null;
+  if (task.content === "") {
+    new Notice("Task content is empty")
+  } else { 
+    response = await api.addTask({
+      content: task.content, 
+      priority: task.priority,
+      // project_id: task.project_id,
+      due_string: task.due_string,
+      due_lang: task.due_lang,
+      description: task.description,
+      parent_id: task.parentTodoistId,
+    });
+  }
   return response;
 }
 
