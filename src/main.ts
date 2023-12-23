@@ -50,7 +50,7 @@ export default class MyPlugin extends Plugin {
     this.api = new TodoistApi(this.settings.apiToken);
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Send to Todoist', async (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('file-check-2', 'Send to Todoist', async (evt: MouseEvent) => {
       const editor = this.app.workspace.getActiveViewOfType(MarkdownView).editor;
       const fileContents = await editor.getValue();
       findAndSendTasks(this.api, 
