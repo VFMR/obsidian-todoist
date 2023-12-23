@@ -61,7 +61,7 @@ To use the Obsidian Todoist Integration plugin, you need to set up your Todoist 
 
 ## Contributing
 
-Contributions to the Obsidian Todoist Integration plugin are welcome! If you encounter any issues or have suggestions for improvements, please open an issue on the [GitHub repository](https://github.com/MVFR/obsidian-todoist) or submit a pull request.
+Contributions to the Obsidian Todoist Integration plugin are welcome! If you encounter any issues or have suggestions for improvements, please open an issue on the [GitHub repository](https://github.com/VFMR/obsidian-todoist) or submit a pull request.
 
 
 ## License
