@@ -21,7 +21,6 @@ interface TodoistTask {
 
 export async function getProjects(api: TodoistApi): TodoistProject[] {
     const projects = await api.getProjects();
-    new Notice(projects)
 
     const project_list: TodoistProject[] = [];
     for (let i = 0; i < projects.length; i++) {
@@ -39,7 +38,7 @@ export async function createTask(api: TodoistApi, task: TodoistTask) {
   // BUG: project_id is not working - "{}" ist sent to the API
   let response = null;
   if (task.content === "") {
-    new Notice("Task content is empty")
+    console.log("Task content is empty");
   } else { 
     response = await api.addTask({
       content: task.content, 
